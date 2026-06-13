@@ -1,0 +1,63 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: dani-cc-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DANI_DEPLOY_SSH_KEY }}" > ~/.ssh/dani_deploy_key
+          chmod 600 ~/.ssh/dani_deploy_key
+          for attempt in 1 2 3 4 5; do
+            ssh-keyscan -T 10 -p "${{ secrets.DANI_DEPLOY_PORT }}" "${{ secrets.DANI_DEPLOY_HOST }}" >> ~/.ssh/known_hosts && break
+            sleep 3
+          done
+
+      - name: Upload release
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.claude' \
+            --exclude='.tooling' \
+            --exclude='morning.db' \
+            --exclude='morning.db-*' \
+            -czf - . | ssh \
+              -i ~/.ssh/dani_deploy_key \
+              -p "${{ secrets.DANI_DEPLOY_PORT }}" \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=accept-new \
+              "${{ secrets.DANI_DEPLOY_USER }}@${{ secrets.DANI_DEPLOY_HOST }}" \
+              "set -euo pipefail; mkdir -p '${{ secrets.DANI_DEPLOY_PATH }}'; tar -xzf - -C '${{ secrets.DANI_DEPLOY_PATH }}'"
+
+      - name: Rebuild and restart
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh \
+            -i ~/.ssh/dani_deploy_key \
+            -p "${{ secrets.DANI_DEPLOY_PORT }}" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=accept-new \
+            "${{ secrets.DANI_DEPLOY_USER }}@${{ secrets.DANI_DEPLOY_HOST }}" \
+            "cd '${{ secrets.DANI_DEPLOY_PATH }}' && docker compose -f deploy/docker-compose.yml up -d --build"

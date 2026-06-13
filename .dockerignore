@@ -1,0 +1,10 @@
+.git
+.github
+.claude
+.tooling
+morning.db
+morning.db-*
+*.db
+*.db-*
+Dockerfile
+deploy
