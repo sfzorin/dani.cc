@@ -1,0 +1,147 @@
+package pages
+
+import (
+	"context"
+	"strings"
+
+	"morning/internal/app"
+	"morning/internal/auth"
+	"morning/internal/i18n"
+	"morning/path"
+
+	"github.com/doors-dev/doors"
+	"github.com/doors-dev/gox"
+)
+
+// settingsForm is the decoded settings submission.
+type settingsForm struct {
+	Name  string `form:"name"`
+	Rest  int    `form:"rest"`
+	Voice bool   `form:"voice"`
+}
+
+// settingsPage lets the user change rest time, language, voice and reset progress.
+type settingsPage struct {
+	sess auth.Session
+	auth doors.Source[auth.Session]
+	path doors.Source[path.Path]
+}
+
+elem (s settingsPage) Main() {
+	~{
+		l := i18n.Lang(s.sess.Lang)
+		saved := doors.NewSource(false)
+		rest := s.sess.Rest
+		if rest < 10 {
+			rest = 10
+		}
+		if rest > 40 {
+			rest = 40
+		}
+		restVal := doors.NewSource(rest)
+		streak, _ := app.DB.Streak(s.sess.UserID, app.Today())
+	}
+	<title>~(i18n.T(l, "settings.title"))</title>
+	<main class="screen">
+		~(header{sess: s.sess, auth: s.auth, path: s.path, streak: streak})
+		<section class="settings">
+			<h1>~(i18n.T(l, "settings.title"))</h1>
+
+			~// Language (applies immediately)
+			<div class="field">
+				<label>~(i18n.T(l, "settings.language"))</label>
+				~(langSwitch{sess: s.sess, auth: s.auth, persist: true})
+			</div>
+
+			~>doors.ASubmit[settingsForm]{On: s.save(saved)} <form class="form">
+				<div class="field">
+					<label>~(i18n.T(l, "auth.name"))</label>
+					<input class="text-input" name="name" type="text" maxlength="40" value=(s.sess.Name) placeholder=(i18n.T(l, "auth.name"))>
+				</div>
+				<div class="field">
+					<label class="row-between">
+						<span>~(i18n.T(l, "settings.rest"))</span>
+						<output class="rest-out">
+							~(restVal.Bind(elem(v int) {
+								~(v, " ", i18n.T(l, "workout.sec"))
+							}))
+						</output>
+					</label>
+					<input
+						type="range"
+						name="rest"
+						min="10"
+						max="40"
+						step="5"
+						value=(rest)
+						(doors.AChange{On: func(ctx context.Context, r doors.RequestEvent[doors.ChangeEvent]) bool {
+							if n := r.Event().Number; n != nil {
+								restVal.Update(ctx, int(*n))
+							}
+							return false
+						}})>
+				</div>
+
+				<div class="field">
+					<label class="switch-label">
+						<input type="checkbox" name="voice" value="true" checked=func { return s.sess.Voice }>
+						<span>~(i18n.T(l, "settings.voice"))</span>
+					</label>
+				</div>
+
+				<button class="btn primary" type="submit">~(i18n.T(l, "settings.save"))</button>
+				~(saved.Bind(elem(ok bool) {
+					~(if ok {
+						<span class="saved-msg">~(i18n.T(l, "settings.saved"))</span>
+					})
+				}))
+			</form>
+
+			<div class="field account">
+				<label>~(i18n.T(l, "settings.account"))</label>
+				~(if s.sess.IsGuest {
+					<div class="email">~(i18n.T(l, "guest.note"))</div>
+					~>doors.ALink{Model: path.Path{Page: path.Register}} <a class="btn primary small">~(i18n.T(l, "auth.register"))</a>
+				} else {
+					<div class="email">~(s.sess.Email)</div>
+				})
+			</div>
+
+			~>doors.AClick{On: s.reset} <button class="btn danger" type="button">~(i18n.T(l, "settings.reset"))</button>
+		</section>
+	</main>
+}
+
+// save persists rest + voice and updates the reactive session.
+func (s settingsPage) save(saved doors.Source[bool]) func(context.Context, doors.RequestForm[settingsForm]) bool {
+	return func(ctx context.Context, r doors.RequestForm[settingsForm]) bool {
+		f := r.Data()
+		rest := f.Rest
+		if rest < 10 {
+			rest = 10
+		}
+		if rest > 40 {
+			rest = 40
+		}
+		name := strings.TrimSpace(f.Name)
+		if len(name) > 40 {
+			name = name[:40]
+		}
+		_ = app.DB.UpdateSettings(s.sess.UserID, name, s.sess.Lang, rest, f.Voice)
+		s.auth.Mutate(ctx, func(cur auth.Session) auth.Session {
+			cur.Name = name
+			cur.Rest = rest
+			cur.Voice = f.Voice
+			return cur
+		})
+		saved.Update(ctx, true)
+		return false
+	}
+}
+
+// reset clears all progress and returns to the home screen.
+func (s settingsPage) reset(ctx context.Context, r doors.RequestPointer) bool {
+	_ = app.DB.ResetProgress(s.sess.UserID)
+	s.path.Update(ctx, path.Path{Page: path.Home})
+	return false
+}

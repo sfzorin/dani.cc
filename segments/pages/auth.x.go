@@ -1,0 +1,337 @@
+// Managed by GoX v0.1.36
+
+//line auth.gox:1
+package pages
+
+import (
+	"context"
+	"net/http"
+	"strings"
+
+	"morning/internal/app"
+	"morning/internal/auth"
+	"morning/internal/db"
+	"morning/internal/i18n"
+	"morning/path"
+
+	"github.com/doors-dev/doors"
+	"github.com/doors-dev/gox"
+)
+
+// credentials is the decoded login/registration form.
+type credentials struct {
+	Name     string `form:"name"`
+	Email    string `form:"email"`
+	Password string `form:"password"`
+}
+
+// authPage renders the login or registration screen.
+type authPage struct {
+	sess     auth.Session
+	auth     doors.Source[auth.Session]
+	path     doors.Source[path.Path]
+	register bool
+}
+
+//line auth.gox:33
+func (a authPage) Main() gox.Elem {
+	return gox.Elem(func(__c gox.Cursor) (__e error) {
+		ctx := __c.Context(); _ = ctx
+//line auth.gox:35
+		l := i18n.Lang(a.sess.Lang)
+		// Local error message state for this render.
+		msg := doors.NewSource("")
+		title := i18n.T(l, "auth.login")
+		submitLabel := i18n.T(l, "auth.login_btn")
+		switchText := i18n.T(l, "auth.no_account")
+		switchLabel := i18n.T(l, "auth.register")
+		switchTo := path.Path{Page: path.Register}
+		if a.register {
+			title = i18n.T(l, "auth.register")
+			submitLabel = i18n.T(l, "auth.register_btn")
+			switchText = i18n.T(l, "auth.have_account")
+			switchLabel = i18n.T(l, "auth.login")
+			switchTo = path.Path{Page: path.Login}
+		}
+
+		__e = __c.Init("title"); if __e != nil { return }
+		{
+			__e = __c.Submit(); if __e != nil { return }
+//line auth.gox:51
+			__e = __c.Any(i18n.T(l, "app.name")); if __e != nil { return }
+		}
+		__e = __c.Close(); if __e != nil { return }
+		__e = __c.Init("main"); if __e != nil { return }
+		{
+//line auth.gox:52
+			__e = __c.Set("class", "auth"); if __e != nil { return }
+			__e = __c.Submit(); if __e != nil { return }
+			__e = __c.Init("div"); if __e != nil { return }
+			{
+//line auth.gox:53
+				__e = __c.Set("class", "auth-card"); if __e != nil { return }
+				__e = __c.Submit(); if __e != nil { return }
+				__e = __c.Init("div"); if __e != nil { return }
+				{
+//line auth.gox:54
+					__e = __c.Set("class", "logo"); if __e != nil { return }
+					__e = __c.Submit(); if __e != nil { return }
+					__e = __c.Text("🌅"); if __e != nil { return }
+				}
+				__e = __c.Close(); if __e != nil { return }
+				__e = __c.Init("h1"); if __e != nil { return }
+				{
+//line auth.gox:55
+					__e = __c.Set("class", "brand"); if __e != nil { return }
+					__e = __c.Submit(); if __e != nil { return }
+//line auth.gox:55
+					__e = __c.Any(i18n.T(l, "app.name")); if __e != nil { return }
+				}
+				__e = __c.Close(); if __e != nil { return }
+				__e = __c.Init("p"); if __e != nil { return }
+				{
+//line auth.gox:56
+					__e = __c.Set("class", "tagline"); if __e != nil { return }
+					__e = __c.Submit(); if __e != nil { return }
+//line auth.gox:56
+					__e = __c.Any(i18n.T(l, "app.tagline")); if __e != nil { return }
+				}
+				__e = __c.Close(); if __e != nil { return }
+				__e = __c.Init("h2"); if __e != nil { return }
+				{
+					__e = __c.Submit(); if __e != nil { return }
+//line auth.gox:57
+					__e = __c.Any(title); if __e != nil { return }
+				}
+				__e = __c.Close(); if __e != nil { return }
+//line auth.gox:58
+				__e = (doors.ASubmit[credentials]{On: a.submit(msg)}).Proxy(__c, gox.Elem(func(__c gox.Cursor) (__e error) {
+					ctx := __c.Context(); _ = ctx
+					__e = __c.Init("form"); if __e != nil { return }
+					{
+//line auth.gox:58
+						__e = __c.Set("class", "form"); if __e != nil { return }
+						__e = __c.Set("novalidate", true); if __e != nil { return }
+						__e = __c.Submit(); if __e != nil { return }
+//line auth.gox:59
+						if a.register {
+							__e = __c.Init("label"); if __e != nil { return }
+							{
+								__e = __c.Submit(); if __e != nil { return }
+//line auth.gox:61
+								__e = __c.Any(i18n.T(l, "auth.name")); if __e != nil { return }
+								__e = __c.InitVoid("input"); if __e != nil { return }
+								{
+//line auth.gox:62
+									__e = __c.Set("name", "name"); if __e != nil { return }
+//line auth.gox:62
+									__e = __c.Set("type", "text"); if __e != nil { return }
+//line auth.gox:62
+									__e = __c.Set("autocomplete", "given-name"); if __e != nil { return }
+//line auth.gox:62
+									__e = __c.Set("maxlength", "40"); if __e != nil { return }
+								}
+								__e = __c.Submit(); if __e != nil { return }
+							}
+							__e = __c.Close(); if __e != nil { return }
+						}
+						__e = __c.Init("label"); if __e != nil { return }
+						{
+							__e = __c.Submit(); if __e != nil { return }
+//line auth.gox:66
+							__e = __c.Any(i18n.T(l, "auth.email")); if __e != nil { return }
+							__e = __c.InitVoid("input"); if __e != nil { return }
+							{
+//line auth.gox:67
+								__e = __c.Set("name", "email"); if __e != nil { return }
+//line auth.gox:67
+								__e = __c.Set("type", "email"); if __e != nil { return }
+//line auth.gox:67
+								__e = __c.Set("autocomplete", "email"); if __e != nil { return }
+//line auth.gox:67
+								__e = __c.Set("inputmode", "email"); if __e != nil { return }
+								__e = __c.Set("required", true); if __e != nil { return }
+							}
+							__e = __c.Submit(); if __e != nil { return }
+						}
+						__e = __c.Close(); if __e != nil { return }
+						__e = __c.Init("label"); if __e != nil { return }
+						{
+							__e = __c.Submit(); if __e != nil { return }
+//line auth.gox:70
+							__e = __c.Any(i18n.T(l, "auth.password")); if __e != nil { return }
+							__e = __c.InitVoid("input"); if __e != nil { return }
+							{
+//line auth.gox:71
+								__e = __c.Set("name", "password"); if __e != nil { return }
+//line auth.gox:71
+								__e = __c.Set("type", "password"); if __e != nil { return }
+//line auth.gox:71
+								__e = __c.Set("autocomplete", "current-password"); if __e != nil { return }
+								__e = __c.Set("required", true); if __e != nil { return }
+							}
+							__e = __c.Submit(); if __e != nil { return }
+						}
+						__e = __c.Close(); if __e != nil { return }
+//line auth.gox:73
+						__e = __c.Any(msg.Bind(func(m string) gox.Elem {
+					return gox.Elem(func(__c gox.Cursor) (__e error) {
+						ctx := __c.Context(); _ = ctx
+//line auth.gox:74
+						if m != "" {
+							__e = __c.Init("p"); if __e != nil { return }
+							{
+//line auth.gox:75
+								__e = __c.Set("class", "err"); if __e != nil { return }
+								__e = __c.Submit(); if __e != nil { return }
+//line auth.gox:75
+								__e = __c.Any(m); if __e != nil { return }
+							}
+							__e = __c.Close(); if __e != nil { return }
+						}
+					return })
+//line auth.gox:77
+				})); if __e != nil { return }
+						__e = __c.Init("button"); if __e != nil { return }
+						{
+//line auth.gox:78
+							__e = __c.Set("class", "btn primary"); if __e != nil { return }
+//line auth.gox:78
+							__e = __c.Set("type", "submit"); if __e != nil { return }
+							__e = __c.Submit(); if __e != nil { return }
+//line auth.gox:78
+							__e = __c.Any(submitLabel); if __e != nil { return }
+						}
+						__e = __c.Close(); if __e != nil { return }
+					}
+					__e = __c.Close(); if __e != nil { return }
+				return })); if __e != nil { return }
+				__e = __c.Init("p"); if __e != nil { return }
+				{
+//line auth.gox:80
+					__e = __c.Set("class", "switch"); if __e != nil { return }
+					__e = __c.Submit(); if __e != nil { return }
+//line auth.gox:81
+					__e = __c.Many(switchText, " "); if __e != nil { return }
+//line auth.gox:82
+					__e = (doors.ALink{Model: switchTo}).Proxy(__c, gox.Elem(func(__c gox.Cursor) (__e error) {
+						ctx := __c.Context(); _ = ctx
+						__e = __c.Init("a"); if __e != nil { return }
+						{
+							__e = __c.Submit(); if __e != nil { return }
+//line auth.gox:82
+							__e = __c.Any(switchLabel); if __e != nil { return }
+						}
+						__e = __c.Close(); if __e != nil { return }
+					return })); if __e != nil { return }
+				}
+				__e = __c.Close(); if __e != nil { return }
+//line auth.gox:84
+				__e = (doors.ALink{Model: path.Path{Page: path.Home}}).Proxy(__c, gox.Elem(func(__c gox.Cursor) (__e error) {
+					ctx := __c.Context(); _ = ctx
+					__e = __c.Init("a"); if __e != nil { return }
+					{
+//line auth.gox:84
+						__e = __c.Set("class", "guest-link"); if __e != nil { return }
+						__e = __c.Submit(); if __e != nil { return }
+//line auth.gox:84
+						__e = __c.Any(i18n.T(l, "auth.continue_guest")); if __e != nil { return }
+					}
+					__e = __c.Close(); if __e != nil { return }
+				return })); if __e != nil { return }
+//line auth.gox:85
+				__e = __c.Any(langSwitch{sess: a.sess, auth: a.auth}); if __e != nil { return }
+			}
+			__e = __c.Close(); if __e != nil { return }
+		}
+		__e = __c.Close(); if __e != nil { return }
+	return })
+//line auth.gox:88
+}
+
+// submit returns the form handler bound to the given error-message source.
+func (a authPage) submit(msg doors.Source[string]) func(context.Context, doors.RequestForm[credentials]) bool {
+	return func(ctx context.Context, r doors.RequestForm[credentials]) bool {
+		l := i18n.Lang(a.sess.Lang)
+		data := r.Data()
+		email := auth.NormalizeEmail(data.Email)
+		pw := data.Password
+		if email == "" || pw == "" {
+			msg.Update(ctx, i18n.T(l, "auth.err_required"))
+			return false
+		}
+
+		var u db.User
+		if a.register {
+			if !auth.ValidEmail(email) {
+				msg.Update(ctx, i18n.T(l, "auth.err_bad_email"))
+				return false
+			}
+			if len(pw) < 6 {
+				msg.Update(ctx, i18n.T(l, "auth.err_short_pass"))
+				return false
+			}
+			hash, err := auth.HashPassword(pw)
+			if err != nil {
+				msg.Update(ctx, i18n.T(l, "auth.err_required"))
+				return false
+			}
+			name := strings.TrimSpace(data.Name)
+			if len(name) > 40 {
+				name = name[:40]
+			}
+			if a.sess.IsGuest && a.sess.UserID != 0 {
+				// Upgrade the current guest in place, preserving progress.
+				if err := app.DB.ConvertGuest(a.sess.UserID, email, hash, name); err != nil {
+					msg.Update(ctx, i18n.T(l, "auth.err_exists"))
+					return false
+				}
+				loaded, _, _ := app.DB.UserByEmail(email)
+				u = loaded
+			} else {
+				created, err := app.DB.CreateUser(email, hash, a.sess.Lang, name)
+				if err != nil {
+					msg.Update(ctx, i18n.T(l, "auth.err_exists"))
+					return false
+				}
+				u = created
+			}
+		} else {
+			hash, ok, _ := app.DB.PassHash(email)
+			if !ok || !auth.CheckPassword(hash, pw) {
+				msg.Update(ctx, i18n.T(l, "auth.err_invalid"))
+				return false
+			}
+			loaded, _, _ := app.DB.UserByEmail(email)
+			u = loaded
+		}
+
+		// Establish a session: DB row + cookie + reactive session state.
+		token, err := auth.NewToken()
+		if err != nil {
+			msg.Update(ctx, i18n.T(l, "auth.err_invalid"))
+			return false
+		}
+		_ = app.DB.CreateSession(token, u.ID, auth.SessionTTL)
+		r.SetCookie(&http.Cookie{
+			Name:     "session",
+			Value:    token,
+			Path:     "/",
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   int(auth.SessionTTL.Seconds()),
+		})
+		doors.SessionExpire(ctx, auth.SessionTTL)
+		a.auth.Update(ctx, auth.Session{
+			Authorized: true,
+			UserID:     u.ID,
+			Email:      u.Email,
+			Name:       u.Name,
+			Lang:       u.Lang,
+			Rest:       u.Rest,
+			Voice:      u.Voice,
+		})
+		a.path.Update(ctx, path.Path{Page: path.Home})
+		return false
+	}
+}

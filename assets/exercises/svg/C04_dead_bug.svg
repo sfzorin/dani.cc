@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 768" role="img" aria-labelledby="c04t c04d">
+  <title id="c04t">Dead bug</title>
+  <desc id="c04d">Схема упражнения: человек лежит на спине, противоположные рука и нога вытягиваются, другие рука и нога согнуты, поясница прижата к коврику.</desc>
+  <defs>
+    <marker id="ah" markerUnits="userSpaceOnUse" markerWidth="26" markerHeight="26" refX="18" refY="13" orient="auto-start-reverse">
+      <path d="M5,3 L21,13 L5,23" fill="none" stroke="#2563EB" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <line id="c04-trunk" x1="316" y1="500" x2="506" y2="506"/>
+    <g id="c04-limbs" fill="none">
+      <line x1="316" y1="500" x2="288" y2="492"/>
+      <polyline points="316,500 232,470 146,452"/>
+      <polyline points="316,500 326,408 334,318"/>
+      <polyline points="506,506 640,470 792,452 840,448"/>
+      <polyline points="506,506 548,358 694,378 726,386"/>
+    </g>
+  </defs>
+
+  <g id="mat">
+    <rect x="120" y="520" width="780" height="120" rx="32" fill="#D1FAE5" stroke="#1F2937" stroke-width="3" opacity="0.7"/>
+  </g>
+
+  <g id="body-end"></g>
+
+  <g id="body-start" stroke-linecap="round" stroke-linejoin="round">
+    <use href="#c04-trunk" stroke="#1F2937" stroke-width="56"/>
+    <use href="#c04-trunk" stroke="#E5E7EB" stroke-width="44"/>
+    <use href="#c04-limbs" stroke="#1F2937" stroke-width="40"/>
+    <use href="#c04-limbs" stroke="#E5E7EB" stroke-width="28"/>
+    <g transform="rotate(-74.1 261 484)"><ellipse cx="261" cy="484" rx="28" ry="34" fill="#1F2937"/><ellipse cx="261" cy="484" rx="22" ry="28" fill="#E5E7EB"/></g>
+  </g>
+
+  <g id="movement-arrows" fill="none" stroke="#2563EB" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 172 442 L 120 420" marker-end="url(#ah)"/>
+    <path d="M 830 458 L 884 484" marker-end="url(#ah)"/>
+  </g>
+
+  <g id="safety-cues" fill="none" stroke="#10B981" stroke-width="4" stroke-linecap="round" stroke-dasharray="2 14">
+    <line x1="430" y1="514" x2="506" y2="516"/>
+  </g>
+</svg>

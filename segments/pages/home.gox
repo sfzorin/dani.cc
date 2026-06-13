@@ -1,0 +1,216 @@
+package pages
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"morning/internal/app"
+	"morning/internal/auth"
+	"morning/internal/content"
+	"morning/internal/i18n"
+	"morning/path"
+
+	"github.com/doors-dev/doors"
+	"github.com/doors-dev/gox"
+)
+
+// homePage is the dashboard: today's session, the date-based streak calendar,
+// and the separate looping 30-day cycle track.
+type homePage struct {
+	sess auth.Session
+	auth doors.Source[auth.Session]
+	path doors.Source[path.Path]
+}
+
+elem (h homePage) Main() {
+	~{
+		l := i18n.Lang(h.sess.Lang)
+		today := app.Today()
+		pos, _ := app.DB.Position(h.sess.UserID)
+		streak, _ := app.DB.Streak(h.sess.UserID, today)
+		doneToday, _ := app.DB.HasActivity(h.sess.UserID, today)
+
+		cycle := pos/content.TotalDays + 1
+		curDay := pos%content.TotalDays + 1
+		adapt, _ := app.DB.GetAdaptState(h.sess.UserID)
+		w := content.BuildAdapted(curDay, h.sess.Rest, adapt.ToAdapt().SuppressIncreaseOnGap(streak > 0))
+		acked, _ := app.DB.SafetyAck(h.sess.UserID)
+		safety := doors.NewSource(acked)
+
+		startLabel := i18n.T(l, "home.start")
+		if pos > 0 {
+			startLabel = i18n.T(l, "home.continue")
+		}
+		if doneToday {
+			startLabel = i18n.T(l, "home.repeat")
+		}
+
+		greeting := i18n.T(l, "home.morning")
+		if h.sess.Name != "" {
+			greeting += ", " + h.sess.Name
+		}
+		greeting += "!"
+
+		monthOffset := doors.NewSource(0)
+	}
+	<title>~(i18n.T(l, "app.name"))</title>
+	<main class="screen">
+		~(header{sess: h.sess, auth: h.auth, path: h.path, streak: streak, title: greeting})
+
+		~(safety.Bind(elem(ok bool) {
+			~(if !ok {
+				<div class="safety-card">
+					<h3>⚠️ ~(i18n.T(l, "safety.title"))</h3>
+					<p>~(i18n.T(l, "safety.text"))</p>
+					~>doors.AClick{On: func(ctx context.Context, r doors.RequestPointer) bool {
+						_ = app.DB.AckSafety(h.sess.UserID)
+						safety.Update(ctx, true)
+						return false
+					}} <button class="btn primary" type="button">~(i18n.T(l, "safety.ok"))</button>
+				</div>
+			})
+		}))
+
+		~(if h.sess.IsGuest {
+			<div class="guest-note">
+				<span>~(i18n.T(l, "guest.note"))</span>
+				~>doors.ALink{Model: path.Path{Page: path.Register}} <a class="btn primary small">~(i18n.T(l, "auth.register"))</a>
+			</div>
+		})
+
+		<section class="hero">
+			~(if doneToday {
+				<p class="done-banner">~(i18n.T(l, "home.done_today"))</p>
+			})
+			<div class="hero-cycle">~(i18n.T(l, "home.cycle"), " ", cycle, "  ·  ", w.BlockCode)</div>
+			<div class="day-num">~(i18n.T(l, "home.day"), " ", curDay)</div>
+			<div class="day-meta">
+				<span>~(len(w.Items), " ", i18n.T(l, "home.exercises"))</span>
+				<span>~(i18n.T(l, "home.est"), " ", minutes(w.EstSec), " ", i18n.T(l, "home.min"))</span>
+			</div>
+			~>doors.ALink{Model: path.Path{Page: path.Day, Day: curDay}} <a class="btn primary big">~(startLabel)</a>
+		</section>
+
+		<section class="streak-row">
+			<span class="fire">🔥</span>
+			<span class="streak-n">~(streak)</span>
+			<span class="streak-label">~(i18n.T(l, "home.streak"), " · ", streak, " ", i18n.T(l, "home.days"))</span>
+		</section>
+
+		~// Date-based habit calendar (drives the streak).
+		<section class="calendar">
+			<h3>~(i18n.T(l, "home.calendar"))</h3>
+			~(h.month(monthOffset))
+		</section>
+
+		~// The looping 30-day program cycle (separate from the date calendar).
+		<section class="cycle">
+			<h3>~(i18n.T(l, "home.cycle"), " ", cycle)</h3>
+			<div class="diff">
+				<div class="diff-bar"></div>
+				<span class="diff-label">~(i18n.T(l, "home.diff"))</span>
+			</div>
+			<div class="cyc-grid">
+				~(for d := 1; d <= content.TotalDays; d++ {
+					~(h.cycleCell(d, curDay))
+				})
+			</div>
+		</section>
+	</main>
+}
+
+// month renders the date calendar for the current month ± offset, reactively.
+elem (h homePage) month(monthOffset doors.Source[int]) {
+	~(monthOffset.Bind(elem(off int) {
+		~{
+			now := time.Now()
+			base := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local)
+			disp := base.AddDate(0, off, 0)
+			year := disp.Year()
+			month := int(disp.Month())
+			daysIn := time.Date(year, time.Month(month)+1, 0, 0, 0, 0, 0, time.Local).Day()
+			lead := (int(disp.Weekday()) + 6) % 7 // Monday-first leading blanks
+			first := disp.Format("2006-01-02")
+			last := time.Date(year, time.Month(month), daysIn, 0, 0, 0, 0, time.Local).Format("2006-01-02")
+			acts, _ := app.DB.ActivityInRange(h.sess.UserID, first, last)
+			todayStr := app.Today()
+			l := i18n.Lang(h.sess.Lang)
+		}
+		<div class="cal-head">
+			~>doors.AClick{On: func(ctx context.Context, r doors.RequestPointer) bool {
+				monthOffset.Mutate(ctx, func(o int) int { return o - 1 })
+				return false
+			}} <button class="cal-nav" type="button">‹</button>
+			<span class="cal-title">~(i18n.Month(l, month), " ", year)</span>
+			~>doors.AClick{On: func(ctx context.Context, r doors.RequestPointer) bool {
+				monthOffset.Mutate(ctx, func(o int) int { return o + 1 })
+				return false
+			}} <button class="cal-nav" type="button">›</button>
+		</div>
+		<div class="cal-week">
+			~(for wd := 0; wd < 7; wd++ {
+				<span>~(i18n.Weekday(l, wd))</span>
+			})
+		</div>
+		<div class="cal-grid month">
+			~(for b := 0; b < lead; b++ {
+				<div class="cal-blank"></div>
+			})
+			~(for dd := 1; dd <= daysIn; dd++ {
+				~(h.dayCell(year, month, dd, acts, todayStr))
+			})
+		</div>
+	}))
+}
+
+// dayCell renders one date cell, marked when the user worked out that day.
+elem (h homePage) dayCell(year, month, dd int, acts map[string]bool, todayStr string) {
+	~{
+		ds := fmt.Sprintf("%04d-%02d-%02d", year, month, dd)
+		cls := "cal-day"
+		if acts[ds] {
+			cls += " act"
+		}
+		if ds == todayStr {
+			cls += " today"
+		}
+	}
+	<div class=(cls)>
+		~(if acts[ds] {
+			🔥
+		} else {
+			~(dd)
+		})
+	</div>
+}
+
+// cycleCell renders one of the 30 program days; sequential, looping each cycle.
+elem (h homePage) cycleCell(d, current int) {
+	~{
+		done := d < current
+		isCurrent := d == current
+		locked := d > current
+		cls := "cell"
+		if done {
+			cls += " done"
+		}
+		if isCurrent {
+			cls += " current"
+		}
+		if locked {
+			cls += " locked"
+		}
+	}
+	~(if locked {
+		<div class=(cls)>~(d)</div>
+	} else {
+		~>doors.ALink{Model: path.Path{Page: path.Day, Day: d}} <a class=(cls)>
+			~(if done {
+				✓
+			} else {
+				~(d)
+			})
+		</a>
+	})
+}

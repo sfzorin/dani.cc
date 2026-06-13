@@ -1,0 +1,54 @@
+// App is the root component: HTML shell, head (PWA meta + styles), and the router.
+package main
+
+import (
+	"morning/assets"
+	"morning/components"
+	"morning/internal/auth"
+	"morning/path"
+	"morning/segments/pages"
+
+	"github.com/doors-dev/doors"
+	"github.com/doors-dev/gox"
+)
+
+// App holds the shared reactive session created by the page factory.
+type App struct {
+	auth doors.Source[auth.Session]
+}
+
+elem (a App) Main() {
+	<!doctype html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8">
+			<meta
+				name="viewport"
+				content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+			<meta name="theme-color" content="#0f172a">
+			<meta name="mobile-web-app-capable" content="yes">
+			<meta name="apple-mobile-web-app-capable" content="yes">
+			<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+			<meta name="apple-mobile-web-app-title" content="Morning">
+			<link rel="manifest" href="/static/manifest.webmanifest">
+			<link rel="icon" type="image/svg+xml" href="/static/icon.svg">
+			<link rel="apple-touch-icon" href="/static/icon-180.png">
+			<link rel="stylesheet" href=(assets.Style) name="main.css">
+			<title>Morning</title>
+		</head>
+		<body>
+			~(doors.Route(
+				doors.RouteModel(func(p doors.Source[path.Path]) gox.Comp {
+					return pages.Root{Path: p, Auth: a.auth}
+				}),
+				doors.RouteLocationDefault(components.NotFound),
+			))
+			~// Register the service worker for offline/installable PWA.
+			<script>
+				if ("serviceWorker" in navigator) {
+					navigator.serviceWorker.register("/static/sw.js").catch(function () {})
+				}
+			</script>
+		</body>
+	</html>
+}

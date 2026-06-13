@@ -1,0 +1,305 @@
+package pages
+
+import (
+	"context"
+	"encoding/json"
+	"strconv"
+
+	"morning/assets"
+	"morning/internal/app"
+	"morning/internal/auth"
+	"morning/internal/content"
+	"morning/internal/i18n"
+	"morning/path"
+
+	"github.com/doors-dev/doors"
+	"github.com/doors-dev/gox"
+)
+
+// completeReq is the body sent by the client when a day is finished, optionally
+// carrying the post-workout feedback.
+type completeReq struct {
+	Day         int              `json:"day"`
+	HasFeedback bool             `json:"hasFeedback"`
+	Feedback    content.Feedback `json:"feedback"`
+}
+
+type playerItem struct {
+	ID      string `json:"id"`
+	Unit    string `json:"unit"`
+	Value   int    `json:"value"`
+	Slot    string `json:"slot"`
+	PerSide bool   `json:"perSide"`
+	Round   int    `json:"round"`
+	Rest    int    `json:"rest"`
+	Name      string `json:"name"`
+	Hint      string `json:"hint"`
+	Warning   string `json:"warning"`
+	Technique string `json:"technique"`
+	Mistake   string `json:"mistake"`
+	SVG       string `json:"svg"`
+	Video     string `json:"video"`
+}
+
+type playerPayload struct {
+	Day    int               `json:"day"`
+	Lang   string            `json:"lang"`
+	BCP47  string            `json:"bcp47"`
+	Voice  bool              `json:"voice"`
+	Name   string            `json:"name"`
+	Items  []playerItem      `json:"items"`
+	Labels map[string]string `json:"labels"`
+	Cues   map[string]string `json:"cues"`
+	Enc    []string          `json:"enc"`
+}
+
+// workoutPage renders the client-driven player for one day.
+type workoutPage struct {
+	sess auth.Session
+	day  int
+	path doors.Source[path.Path]
+}
+
+func (w workoutPage) clampDay() int {
+	d := w.day
+	if d < 1 {
+		d = 1
+	}
+	if d > content.TotalDays {
+		d = content.TotalDays
+	}
+	return d
+}
+
+// payloadJSON serializes everything the client player needs.
+func (w workoutPage) payloadJSON() string {
+	l := i18n.Lang(w.sess.Lang)
+	day := w.clampDay()
+	adapt, _ := app.DB.GetAdaptState(w.sess.UserID)
+	streak, _ := app.DB.Streak(w.sess.UserID, app.Today())
+	wk := content.BuildAdapted(day, w.sess.Rest, adapt.ToAdapt().SuppressIncreaseOnGap(streak > 0))
+
+	items := make([]playerItem, 0, len(wk.Items))
+	for _, it := range wk.Items {
+		items = append(items, playerItem{
+			ID:      it.ExerciseID,
+			Unit:    string(it.Unit),
+			Value:   it.Value,
+			Slot:    string(it.Slot),
+			PerSide: it.PerSide,
+			Round:   it.Round,
+			Rest:    it.Rest,
+			Name:      i18n.Exercise(l, it.ExerciseID),
+			Hint:      i18n.Hint(l, it.ExerciseID),
+			Warning:   i18n.Warning(l, it.ExerciseID),
+			Technique: i18n.Technique(l, it.ExerciseID),
+			Mistake:   i18n.Mistake(l, it.ExerciseID),
+			SVG:       "/static/ex/" + it.ExerciseID + ".svg",
+			Video:     content.Pool[it.ExerciseID].Video,
+		})
+	}
+
+	labels := map[string]string{
+		"warmup":     i18n.T(l, "workout.warmup"),
+		"main":       i18n.T(l, "workout.main"),
+		"cooldown":   i18n.T(l, "workout.cooldown"),
+		"round":      i18n.T(l, "workout.round"),
+		"rest":       i18n.T(l, "workout.rest"),
+		"ready":      i18n.T(l, "workout.get_ready"),
+		"next":       i18n.T(l, "workout.next"),
+		"pause":      i18n.T(l, "workout.pause"),
+		"resume":     i18n.T(l, "workout.resume"),
+		"skip":       i18n.T(l, "workout.skip"),
+		"prev":       i18n.T(l, "workout.prev"),
+		"done":       i18n.T(l, "workout.done"),
+		"sec":        i18n.T(l, "workout.sec"),
+		"reps":       i18n.T(l, "workout.x_reps"),
+		"breaths":    i18n.T(l, "workout.breaths"),
+		"side":       i18n.T(l, "workout.side"),
+		"done_title": i18n.T(l, "done.title"),
+		"bravo":      i18n.T(l, "done.bravo"),
+		"day_done":   i18n.T(l, "done.day_done"),
+		"streak":     i18n.T(l, "done.streak"),
+		"back_home":  i18n.T(l, "done.back_home"),
+	}
+	cues := map[string]string{
+		"ready":       i18n.Cue(l, "ready"),
+		"go":          i18n.Cue(l, "go"),
+		"rest":        i18n.Cue(l, "rest"),
+		"next":        i18n.Cue(l, "next"),
+		"halfway":     i18n.Cue(l, "halfway"),
+		"last":        i18n.Cue(l, "last"),
+		"well_done":   i18n.Cue(l, "well_done"),
+		"workout_end": i18n.Cue(l, "workout_end"),
+		"switch_side": i18n.Cue(l, "switch_side"),
+	}
+	enc := make([]string, 0, 6)
+	for n := 0; n < 6; n++ {
+		enc = append(enc, i18n.T(l, "enc."+strconv.Itoa(n)))
+	}
+
+	p := playerPayload{
+		Day:    day,
+		Lang:   w.sess.Lang,
+		BCP47:  i18n.BCP47(l),
+		Voice:  w.sess.Voice,
+		Name:   w.sess.Name,
+		Items:  items,
+		Labels: labels,
+		Cues:   cues,
+		Enc:    enc,
+	}
+	b, _ := json.Marshal(p)
+	return string(b)
+}
+
+// complete is the JS hook fired when a day finishes. It records today's
+// activity (streak/calendar), advances the looping 30-day cycle when the
+// finished day is the current one, and folds the optional post-workout feedback
+// into the adaptation state that shapes the next workout. Returns the streak.
+func (w workoutPage) complete(ctx context.Context, r doors.RequestHook[completeReq]) (any, bool) {
+	uid := w.sess.UserID
+	day := w.clampDay()
+	today := app.Today()
+	data := r.Data()
+
+	_ = app.DB.RecordActivity(uid, today)
+
+	// One session passed: decay block counters and clear the one-shot
+	// level/force-R that applied to this workout.
+	st, _ := app.DB.GetAdaptState(uid)
+	st = st.Decay()
+
+	if pos, err := app.DB.Position(uid); err == nil {
+		if day == pos%content.TotalDays+1 {
+			_ = app.DB.AdvancePosition(uid)
+		}
+	}
+
+	if data.HasFeedback {
+		st = content.NextAdapt(st, data.Feedback)
+		_ = app.DB.AddFeedback(uid, today, day, data.Feedback)
+	}
+	_ = app.DB.SetAdaptState(uid, st)
+
+	streak, _ := app.DB.Streak(uid, today)
+	return streak, false
+}
+
+// painGroup renders a 3-chip pain question (None / A bit / Pain → 0 / 3 / 6).
+elem (w workoutPage) painGroup(l i18n.Lang, key, labelKey string) {
+	<div class="fb-q fb-group" data-key=(key)>
+		<label class="fb-label">~(i18n.T(l, labelKey))</label>
+		<div class="fb-chips">
+			<button type="button" class="fb-chip active" data-val="0">~(i18n.T(l, "fb.none"))</button>
+			<button type="button" class="fb-chip" data-val="3">~(i18n.T(l, "fb.some"))</button>
+			<button type="button" class="fb-chip" data-val="6">~(i18n.T(l, "fb.pain"))</button>
+		</div>
+	</div>
+}
+
+elem (w workoutPage) Main() {
+	~{
+		l := i18n.Lang(w.sess.Lang)
+		payloadStr := w.payloadJSON()
+	}
+	<title>~(i18n.T(l, "app.name"))</title>
+	<div class="player">
+		<div class="player-top">
+			~>doors.ALink{Model: path.Path{Page: path.Home}} <a class="quit" aria-label=(i18n.T(l, "workout.quit"))>✕</a>
+			<div class="pbar"><div class="pbar-fill"></div></div>
+			<div class="phase"></div>
+			<button class="info-btn" type="button" aria-label=(i18n.T(l, "info.technique"))>ⓘ</button>
+		</div>
+
+		<div class="stage">
+			<div class="ex-index"></div>
+			<img class="ex-svg" alt="">
+			<div class="ex-name"></div>
+			<div class="ex-side"></div>
+			<div class="ex-value"></div>
+			<div class="ex-hint"></div>
+			<div class="ex-warn"></div>
+		</div>
+
+		<div class="controls">
+			<button class="ctl-prev btn" type="button" aria-label=(i18n.T(l, "workout.prev"))>◀</button>
+			<button class="ctl-pause btn" type="button"></button>
+			<button class="ctl-skip btn" type="button"></button>
+			<button class="ctl-done btn primary" type="button"></button>
+		</div>
+
+		<div class="rest-overlay hidden">
+			<div class="rest-title"></div>
+			<div class="rest-count"></div>
+			<div class="rest-next"></div>
+			<div class="rest-actions">
+				<button class="rest-back" type="button"></button>
+				<button class="rest-skip" type="button"></button>
+			</div>
+		</div>
+
+		~// Exercise detail card (full technique / mistake / safety warning).
+		<div class="info-overlay hidden">
+			<div class="info-card">
+				<img class="info-media" alt="">
+				<h2 class="info-name"></h2>
+				<div class="info-sec info-tech-sec">
+					<h3>~(i18n.T(l, "info.technique"))</h3>
+					<p class="info-tech"></p>
+				</div>
+				<div class="info-sec info-mistake-sec">
+					<h3>~(i18n.T(l, "info.mistake"))</h3>
+					<p class="info-mistake"></p>
+				</div>
+				<div class="info-sec info-warn-sec">
+					<h3>⚠️ ~(i18n.T(l, "info.warning"))</h3>
+					<p class="info-warn"></p>
+				</div>
+				<button class="info-close btn primary" type="button">~(i18n.T(l, "info.close"))</button>
+			</div>
+		</div>
+
+		~// Post-workout feedback (spec §14). Server-rendered labels; JS collects values.
+		<div class="feedback-overlay hidden">
+			<h2>~(i18n.T(l, "fb.title"))</h2>
+			<div class="fb-q">
+				<label class="row-between">
+					<span>~(i18n.T(l, "fb.difficulty"))</span>
+					<output class="fb-diff-out">6</output>
+				</label>
+				<input class="fb-diff" type="range" min="1" max="10" value="6">
+			</div>
+			~(w.painGroup(l, "knee", "fb.knee"))
+			~(w.painGroup(l, "back", "fb.back"))
+			~(w.painGroup(l, "shoulder", "fb.shoulder"))
+			<div class="fb-q fb-group" data-key="energy">
+				<label class="fb-label">~(i18n.T(l, "fb.energy"))</label>
+				<div class="fb-chips">
+					<button type="button" class="fb-chip" data-val="worse">~(i18n.T(l, "fb.worse"))</button>
+					<button type="button" class="fb-chip active" data-val="normal">~(i18n.T(l, "fb.normal"))</button>
+					<button type="button" class="fb-chip" data-val="better">~(i18n.T(l, "fb.better"))</button>
+				</div>
+			</div>
+			<div class="fb-actions">
+				<button type="button" class="fb-save btn primary">~(i18n.T(l, "fb.save"))</button>
+				<button type="button" class="fb-skip">~(i18n.T(l, "fb.skip"))</button>
+			</div>
+		</div>
+
+		<div class="done-overlay hidden">
+			<div class="applause">👏</div>
+			<div class="done-title"></div>
+			<div class="done-enc"></div>
+			<div class="done-streak"></div>
+			~>doors.ALink{Model: path.Path{Page: path.Home}} <a class="btn primary back-home">~(i18n.T(l, "done.back_home"))</a>
+		</div>
+
+		<script
+			src=(assets.Player)
+			inline
+			data:payload=(payloadStr)
+			(doors.AHook[completeReq]{Name: "complete", On: w.complete})>
+		</script>
+	</div>
+}

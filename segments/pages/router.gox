@@ -1,0 +1,56 @@
+// Package pages holds the application's page components (router, auth, home,
+// workout, settings) and their server handlers.
+package pages
+
+import (
+	"morning/internal/auth"
+	"morning/path"
+
+	"github.com/doors-dev/doors"
+	"github.com/doors-dev/gox"
+)
+
+// Root is the top dispatcher. It binds the shared session: unauthenticated
+// visitors see the auth pages; authenticated users see the app.
+type Root struct {
+	Path doors.Source[path.Path]
+	Auth doors.Source[auth.Session]
+}
+
+elem (r Root) Main() {
+	~(r.Auth.Bind(elem(s auth.Session) {
+		~(if !s.Authorized {
+			~(r.publicRoutes(s))
+		} else {
+			~(r.privateRoutes(s))
+		})
+	}))
+}
+
+// publicRoutes: login (default) and register.
+elem (r Root) publicRoutes(s auth.Session) {
+	~(r.Path.Route(
+		doors.RouteMatch(func(p path.Path) bool { return p.Page == path.Register }).
+			Comp(authPage{sess: s, auth: r.Auth, path: r.Path, register: true}),
+		doors.RouteDefaultComp[path.Path](authPage{sess: s, auth: r.Auth, path: r.Path, register: false}),
+	))
+}
+
+// privateRoutes: settings, the workout player (/day/:n), and home (default).
+// Guests can also reach the auth pages to upgrade to a real account.
+elem (r Root) privateRoutes(s auth.Session) {
+	~(r.Path.Route(
+		doors.RouteMatch(func(p path.Path) bool { return p.Page == path.Register }).
+			Comp(authPage{sess: s, auth: r.Auth, path: r.Path, register: true}),
+		doors.RouteMatch(func(p path.Path) bool { return p.Page == path.Login }).
+			Comp(authPage{sess: s, auth: r.Auth, path: r.Path, register: false}),
+		doors.RouteMatch(func(p path.Path) bool { return p.Page == path.Settings }).
+			Comp(settingsPage{sess: s, auth: r.Auth, path: r.Path}),
+		doors.RouteDerive(func(p path.Path) (int, bool) {
+			return p.Day, p.Page == path.Day
+		}).Bind(func(day int) gox.Elem {
+			return workoutPage{sess: s, day: day, path: r.Path}.Main()
+		}),
+		doors.RouteDefaultComp[path.Path](homePage{sess: s, auth: r.Auth, path: r.Path}),
+	))
+}

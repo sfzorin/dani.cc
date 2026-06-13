@@ -1,0 +1,101 @@
+package pages
+
+import (
+	"context"
+	"net/http"
+
+	"morning/internal/app"
+	"morning/internal/auth"
+	"morning/internal/i18n"
+	"morning/path"
+
+	"github.com/doors-dev/doors"
+	"github.com/doors-dev/gox"
+)
+
+// langSwitch is a compact language selector. It updates the shared session and,
+// when persist is set, saves the choice to the user's account.
+type langSwitch struct {
+	sess    auth.Session
+	auth    doors.Source[auth.Session]
+	persist bool
+}
+
+elem (ls langSwitch) Main() {
+	~{
+		cur := i18n.Lang(ls.sess.Lang)
+	}
+	<select class="lang-select" (doors.AChange{On: ls.onChange})>
+		~(for _, m := range i18n.Languages {
+			<option value=(string(m.Code)) selected=func { return m.Code == cur }>
+				~(m.Name)
+			</option>
+		})
+	</select>
+}
+
+func (ls langSwitch) onChange(ctx context.Context, r doors.RequestEvent[doors.ChangeEvent]) bool {
+	code := r.Event().Value
+	if !i18n.Valid(code) {
+		return false
+	}
+	ls.auth.Mutate(ctx, func(s auth.Session) auth.Session {
+		s.Lang = code
+		return s
+	})
+	if ls.persist && ls.sess.UserID != 0 {
+		_ = app.DB.SetLang(ls.sess.UserID, code)
+	}
+	return false
+}
+
+// header is the top bar for in-app pages: streak, settings + logout, and a
+// left-side title. When title is set it replaces the brand (e.g. the home
+// greeting), so the greeting is the very first line — no extra brand row.
+type header struct {
+	sess   auth.Session
+	auth   doors.Source[auth.Session]
+	path   doors.Source[path.Path]
+	streak int
+	title  string
+}
+
+elem (h header) Main() {
+	~{
+		l := i18n.Lang(h.sess.Lang)
+	}
+	<header class="top">
+		~(if h.title != "" {
+			<span class="greet">~(h.title)</span>
+		} else {
+			~>doors.ALink{Model: path.Path{Page: path.Home}} <a class="brand">~(i18n.T(l, "app.name"))</a>
+		})
+		<div class="top-right">
+			<span class="streak-badge" title=(i18n.T(l, "home.streak"))>🔥 ~(h.streak)</span>
+			~>doors.ALink{Model: path.Path{Page: path.Settings}} <a class="icon-btn" aria-label=(i18n.T(l, "nav.settings"))>⚙️</a>
+			~(if !h.sess.IsGuest {
+				~>doors.AClick{On: h.logout} <button class="icon-btn" type="button" aria-label=(i18n.T(l, "nav.logout"))>⎋</button>
+			})
+		</div>
+	</header>
+}
+
+func (h header) logout(ctx context.Context, r doors.RequestPointer) bool {
+	if c, err := r.GetCookie("session"); err == nil {
+		_ = app.DB.DeleteSession(c.Value)
+	}
+	r.SetCookie(&http.Cookie{Name: "session", Path: "/", MaxAge: -1, HttpOnly: true})
+	doors.SessionExpire(ctx, 0)
+	h.auth.Update(ctx, auth.Session{Lang: h.sess.Lang, Rest: 20})
+	h.path.Update(ctx, path.Path{Page: path.Login})
+	return false
+}
+
+// minutes renders a seconds count as a rounded minute number (min 1).
+func minutes(sec int) int {
+	m := (sec + 59) / 60
+	if m < 1 {
+		m = 1
+	}
+	return m
+}

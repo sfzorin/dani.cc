@@ -1,0 +1,23 @@
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: dani-web:latest
+    container_name: dani-web
+    restart: unless-stopped
+    environment:
+      MORNING_DB: /data/morning.db
+    expose:
+      - "8080"
+    volumes:
+      - dani_data:/data
+    networks:
+      - global-proxy-net
+
+networks:
+  global-proxy-net:
+    external: true
+
+volumes:
+  dani_data:

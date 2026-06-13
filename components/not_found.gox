@@ -1,0 +1,26 @@
+// Package components holds reusable UI components shared across pages.
+package components
+
+import (
+	"github.com/doors-dev/doors"
+	"github.com/doors-dev/gox"
+)
+
+// NotFound renders the 404 fallback page.
+// It receives the raw location source and:
+//   - Sets the HTTP response status to 404 (initial render only)
+//   - Sets the page title to "Not Found"
+//   - Displays the unmatched path reactively via Bind
+//
+// Note: title and status tags can be rendered anywhere in the tree;
+// Doors moves <title> into <head> and applies Status to the response.
+elem NotFound(location doors.Source[doors.Location]) {
+	~(doors.Status(404))
+	<title>Not Found</title>
+	<h1>Not Found</h1>
+	<p>
+		~(location.Bind(elem(l doors.Location) {
+			Page `~(l.Path())` not found. 
+		}))
+	</p>
+}

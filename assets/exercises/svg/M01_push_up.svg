@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 768" role="img" aria-labelledby="m01t m01d">
+  <title id="m01t">Отжимания классические</title>
+  <desc id="m01d">Схема упражнения: верхняя и нижняя позиция отжимания со стрелкой движения вниз-вверх и линией прямого корпуса.</desc>
+  <defs>
+    <marker id="ah" markerUnits="userSpaceOnUse" markerWidth="26" markerHeight="26" refX="18" refY="13" orient="auto-start-reverse">
+      <path d="M5,3 L21,13 L5,23" fill="none" stroke="#2563EB" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <line id="m01-trunk" x1="372" y1="346" x2="560" y2="392"/>
+    <g id="m01-limbs" fill="none">
+      <line x1="372" y1="346" x2="345" y2="332"/>
+      <polyline points="372,346 372,451 372,556"/>
+      <polyline points="560,392 706,425 860,460 845,512 892,556"/>
+    </g>
+    <g id="m01-ghost" fill="none">
+      <line x1="372" y1="470" x2="560" y2="470"/>
+      <line x1="372" y1="470" x2="345" y2="458"/>
+      <polyline points="372,470 465,537 372,556"/>
+      <polyline points="560,470 706,467 860,464 845,512 892,556"/>
+    </g>
+  </defs>
+
+  <g id="mat">
+    <rect x="120" y="560" width="780" height="90" rx="32" fill="#D1FAE5" stroke="#1F2937" stroke-width="3" opacity="0.7"/>
+  </g>
+
+  <g id="body-end" opacity="0.4" stroke-linecap="round" stroke-linejoin="round">
+    <use href="#m01-ghost" stroke="#9CA3AF" stroke-width="30"/>
+    <g transform="rotate(-62.6 320 445)"><ellipse cx="320" cy="445" rx="27" ry="33" fill="#9CA3AF"/></g>
+  </g>
+
+  <g id="body-start" stroke-linecap="round" stroke-linejoin="round">
+    <use href="#m01-trunk" stroke="#1F2937" stroke-width="56"/>
+    <use href="#m01-trunk" stroke="#E5E7EB" stroke-width="44"/>
+    <use href="#m01-limbs" stroke="#1F2937" stroke-width="40"/>
+    <use href="#m01-limbs" stroke="#E5E7EB" stroke-width="28"/>
+    <g transform="rotate(-62.6 320 319)"><ellipse cx="320" cy="319" rx="28" ry="34" fill="#1F2937"/><ellipse cx="320" cy="319" rx="22" ry="28" fill="#E5E7EB"/></g>
+  </g>
+
+  <g id="movement-arrows" fill="none" stroke="#2563EB" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 500 378 L 500 486" marker-start="url(#ah)" marker-end="url(#ah)"/>
+  </g>
+
+  <g id="safety-cues" fill="none" stroke="#10B981" stroke-width="4" stroke-linecap="round" stroke-dasharray="2 14">
+    <line x1="300" y1="296" x2="900" y2="448"/>
+  </g>
+</svg>

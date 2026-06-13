@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 768" role="img" aria-labelledby="c02t c02d">
+  <title id="c02t">Планка на локтях</title>
+  <desc id="c02d">Схема упражнения: удержание планки на предплечьях, предплечья направлены вперёд, тело одной прямой линией от плеч до пяток.</desc>
+  <defs>
+    <line id="c02-trunk" x1="406" y1="442" x2="594" y2="470"/>
+    <g id="c02-limbs" fill="none">
+      <line x1="406" y1="442" x2="372" y2="452"/>
+      <polyline points="406,442 400,556 306,556"/>
+      <polyline points="594,470 742,492 898,512 884,552 916,556"/>
+    </g>
+  </defs>
+
+  <g id="mat">
+    <rect x="120" y="560" width="780" height="90" rx="32" fill="#D1FAE5" stroke="#1F2937" stroke-width="3" opacity="0.7"/>
+  </g>
+
+  <g id="body-end"></g>
+
+  <g id="body-start" stroke-linecap="round" stroke-linejoin="round">
+    <use href="#c02-trunk" stroke="#1F2937" stroke-width="56"/>
+    <use href="#c02-trunk" stroke="#E5E7EB" stroke-width="44"/>
+    <use href="#c02-limbs" stroke="#1F2937" stroke-width="40"/>
+    <use href="#c02-limbs" stroke="#E5E7EB" stroke-width="28"/>
+    <g transform="rotate(-106.4 345 460)"><ellipse cx="345" cy="460" rx="28" ry="34" fill="#1F2937"/><ellipse cx="345" cy="460" rx="22" ry="28" fill="#E5E7EB"/></g>
+  </g>
+
+  <g id="movement-arrows"></g>
+
+  <g id="safety-cues" fill="none" stroke="#10B981" stroke-width="4" stroke-linecap="round" stroke-dasharray="2 14">
+    <line x1="372" y1="436" x2="902" y2="514"/>
+  </g>
+</svg>
