@@ -132,18 +132,16 @@ func (d *DB) SetProgramJSON(userID int64, j string) error {
 	return err
 }
 
-// ActiveProgram returns "builtin" or "custom".
+// ActiveProgram returns the stored active-program key ("custom" or a standard
+// program key); the app layer normalizes legacy/unknown values.
 func (d *DB) ActiveProgram(userID int64) (string, error) {
 	var s string
 	err := d.sql.QueryRow(`SELECT active_program FROM users WHERE id = ?`, userID).Scan(&s)
 	return s, err
 }
 
-// SetActiveProgram selects which program is active ("builtin" | "custom").
+// SetActiveProgram stores which program is active ("custom" or a standard key).
 func (d *DB) SetActiveProgram(userID int64, which string) error {
-	if which != "custom" {
-		which = "builtin"
-	}
 	_, err := d.sql.Exec(`UPDATE users SET active_program = ? WHERE id = ?`, which, userID)
 	return err
 }

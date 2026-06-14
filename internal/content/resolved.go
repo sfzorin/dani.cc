@@ -35,7 +35,7 @@ type RItem struct {
 // ResolveBuiltin flattens the built-in program: shared warm-up/cool-down series
 // plus each day's main block (with its baked-in day-to-day progression).
 func ResolveBuiltin() Resolved {
-	r := Resolved{Version: 1, Name: "dani.cc", TotalDays: TotalDays, WarmupRounds: warmupRounds}
+	r := Resolved{Version: 1, Name: "Sergey", TotalDays: TotalDays, WarmupRounds: warmupRounds}
 	r.Warmup = seqItems(warmupSeq, Warmup)
 	r.Cooldown = seqItems(cooldownSeq, Cooldown)
 	for day := 1; day <= TotalDays; day++ {

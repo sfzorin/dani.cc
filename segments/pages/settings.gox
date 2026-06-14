@@ -54,7 +54,7 @@ elem (s settingsPage) Main() {
 		}
 		restVal := doors.NewSource(rest)
 		streak, _ := app.DB.Streak(s.sess.UserID, app.Today())
-		active, _ := app.DB.ActiveProgram(s.sess.UserID)
+		active := app.ActiveProgramKey(s.sess.UserID)
 		hasCustom := app.HasCustomProgram(s.sess.UserID)
 		cat := app.UserCatalog(s.sess.UserID)
 		entries := cat.List(l)
@@ -150,11 +150,13 @@ elem (s settingsPage) Main() {
 				<details class="cycle-details">
 					<summary>~(i18n.T(l, "settings.cycle"))</summary>
 
-					~// Program selector — the built-in dani.cc is always available and cannot be deleted.
+					~// Program selector — standard sets are always available and cannot be deleted.
 					<div class="srow">
 						<span>~(i18n.T(l, "settings.program"))</span>
 						<select class="lang-select compact" (doors.AChange{On: s.selectProgram})>
-							<option value="builtin" selected=func { return active != "custom" }>dani.cc</option>
+							~(for _, p := range content.StandardPrograms {
+								<option value=(p.Key) selected=func { return active == p.Key }>~(p.Name)</option>
+							})
 							~(if hasCustom {
 								<option value="custom" selected=func { return active == "custom" }>~(i18n.T(l, "settings.my_version"))</option>
 							})
@@ -632,7 +634,7 @@ func (s settingsPage) saveEditor(editSrc doors.Source[editState], nameSrc doors.
 		}
 		name := strings.TrimSpace(nameSrc.Get())
 		if name == "" {
-			name = "my dani.cc"
+			name = "My program"
 		}
 		if len(name) > 40 {
 			name = name[:40]
@@ -686,18 +688,18 @@ func validDoc(d catalog.Doc) bool {
 	return true
 }
 
-// selectProgram switches the active program (builtin | custom) and reloads.
+// selectProgram switches the active program (a standard key or "custom") and reloads.
 func (s settingsPage) selectProgram(ctx context.Context, r doors.RequestEvent[doors.ChangeEvent]) bool {
 	app.DB.SetActiveProgram(s.sess.UserID, r.Event().Value)
 	_ = r.After(doors.ActionLocationReload{})
 	return false
 }
 
-// deleteProgram removes the custom program and reverts to the built-in (which
-// can never be deleted), then reloads.
+// deleteProgram removes the custom program and reverts to the default standard
+// program (which can never be deleted), then reloads.
 func (s settingsPage) deleteProgram(ctx context.Context, r doors.RequestPointer) bool {
 	_ = app.DB.SetProgramJSON(s.sess.UserID, "")
-	_ = app.DB.SetActiveProgram(s.sess.UserID, "builtin")
+	_ = app.DB.SetActiveProgram(s.sess.UserID, content.DefaultStandardKey())
 	_ = r.After(doors.ActionLocationReload{})
 	return false
 }

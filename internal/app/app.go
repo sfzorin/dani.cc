@@ -17,8 +17,8 @@ func Today() string {
 	return time.Now().Format("2006-01-02")
 }
 
-// ProgramByKey returns the program for "custom" (the stored one, if any) or the
-// built-in program (flattened). The built-in is always available.
+// ProgramByKey returns the program for "custom" (the stored one, if any) or a
+// standard program by key, falling back to the default standard program.
 func ProgramByKey(userID int64, key string) content.Resolved {
 	if key == "custom" {
 		if j, err := DB.GetProgramJSON(userID); err == nil && j != "" {
@@ -27,7 +27,11 @@ func ProgramByKey(userID int64, key string) content.Resolved {
 			}
 		}
 	}
-	return content.ResolveBuiltin()
+	if r, ok := content.StandardByKey(key); ok {
+		return r
+	}
+	r, _ := content.StandardByKey(content.DefaultStandardKey())
+	return r
 }
 
 // SeedBuiltins makes the global `exercises` table match the built-in library
@@ -65,14 +69,23 @@ func HasCustomProgram(userID int64) bool {
 	return err == nil && j != ""
 }
 
-func activeKey(userID int64) string {
+// ActiveProgramKey returns the user's selected program key: "custom" when a saved
+// custom program is active, otherwise a valid standard program key (the default
+// when the stored value is empty or a legacy/unknown key).
+func ActiveProgramKey(userID int64) string {
 	k, _ := DB.ActiveProgram(userID)
-	return k
+	if k == "custom" && HasCustomProgram(userID) {
+		return "custom"
+	}
+	if _, ok := content.StandardByKey(k); ok {
+		return k
+	}
+	return content.DefaultStandardKey()
 }
 
-// UserProgram returns the user's active program (built-in or custom).
+// UserProgram returns the user's active program (a standard set or custom).
 func UserProgram(userID int64) content.Resolved {
-	return ProgramByKey(userID, activeKey(userID))
+	return ProgramByKey(userID, ActiveProgramKey(userID))
 }
 
 // UserWorkout builds a day's workout from the active program (built-in or custom),
