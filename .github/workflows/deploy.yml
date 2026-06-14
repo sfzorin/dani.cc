@@ -48,7 +48,7 @@ jobs:
               -o IdentitiesOnly=yes \
               -o StrictHostKeyChecking=accept-new \
               "${{ secrets.DANI_DEPLOY_USER }}@${{ secrets.DANI_DEPLOY_HOST }}" \
-              "set -euo pipefail; rm -rf '${{ secrets.DANI_DEPLOY_PATH }}'; mkdir -p '${{ secrets.DANI_DEPLOY_PATH }}'; tar -xzf - -C '${{ secrets.DANI_DEPLOY_PATH }}'"
+              "set -euo pipefail; mkdir -p '${{ secrets.DANI_DEPLOY_PATH }}'; find '${{ secrets.DANI_DEPLOY_PATH }}' -mindepth 1 -maxdepth 1 -exec rm -rf {} +; tar -xzf - -C '${{ secrets.DANI_DEPLOY_PATH }}'"
 
       - name: Rebuild and restart
         shell: bash
