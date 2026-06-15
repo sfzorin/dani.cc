@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 768" role="img" aria-labelledby="C02t"><title id="C02t">C02_forearm_plank</title>
+  <defs><path id="FT" d="M 8,-6 C 34,-6 50,0 57,9 C 63,13 61,21 51,21 L -8,21 C -18,21 -18,-3 -9,-5 Z"/><marker id="ah" markerUnits="userSpaceOnUse" markerWidth="26" markerHeight="26" refX="18" refY="13" orient="auto-start-reverse"><path d="M5,3 L21,13 L5,23" fill="none" stroke="#2563EB" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+  <g><line x1="113.1" y1="702.0" x2="910.9" y2="702.0" stroke="#1F2937" stroke-width="4" stroke-linecap="round" opacity="0.45"/></g>
+  <g transform="translate(481.1 516.5) scale(1.25)" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M -170.7,-38.5 L -180.5,-22.3" fill="none" stroke="#1F2937" stroke-width="40"/><path d="M -170.7,-38.5 L -180.5,-22.3" fill="none" stroke="#E5E7EB" stroke-width="28"/>
+      <path d="M -180.5,-22.3 L -180.5,93.7 L -270.4,97.4" fill="none" stroke="#1F2937" stroke-width="40"/><path d="M -180.5,-22.3 L -180.5,93.7 L -270.4,97.4" fill="none" stroke="#E5E7EB" stroke-width="28"/>
+      <circle cx="-180.5" cy="-22.3" r="17" fill="#E5E7EB" stroke="#1F2937" stroke-width="6"/>
+      <circle cx="-180.5" cy="93.7" r="15" fill="#E5E7EB" stroke="#1F2937" stroke-width="6"/>
+      <path d="M -1.8,7.8 L 143.2,50.1 L 288.2,92.4" fill="none" stroke="#1F2937" stroke-width="40"/><path d="M -1.8,7.8 L 143.2,50.1 L 288.2,92.4" fill="none" stroke="#E5E7EB" stroke-width="28"/>
+      <use href="#FT" transform="translate(288.2 92.4) rotate(59.8)" fill="#E5E7EB" stroke="#1F2937" stroke-width="6"/>
+      <circle cx="-1.8" cy="7.8" r="17" fill="#E5E7EB" stroke="#1F2937" stroke-width="6"/>
+      <circle cx="143.2" cy="50.1" r="15" fill="#E5E7EB" stroke="#1F2937" stroke-width="6"/>
+      <path d="M -170.7,-38.5 L -196.1,-44.2" fill="none" stroke="#1F2937" stroke-width="40"/><path d="M -170.7,-38.5 L -196.1,-44.2" fill="none" stroke="#E5E7EB" stroke-width="28"/>
+      <path d="M 5.1,-22.4 L -72.9,-34.8 L -134.5,-55.9 L -165.0,-63.9 Q -178.5,-40.3 -176.4,-13.2 L -145.5,-7.2 L -80.8,0.2 L -5.1,22.4 Q 9.8,2.2 5.1,-22.4 Z" fill="#E5E7EB" stroke="#1F2937" stroke-width="6" stroke-linejoin="round"/>
+      <ellipse cx="-233.1" cy="-52.6" rx="29" ry="41" fill="#E5E7EB" stroke="#1F2937" stroke-width="6" transform="rotate(-77.3 -233.1 -52.6)"/>
+      <path d="M -1.8,7.8 L 143.2,50.1 L 288.2,92.4" fill="none" stroke="#1F2937" stroke-width="40"/><path d="M -1.8,7.8 L 143.2,50.1 L 288.2,92.4" fill="none" stroke="#E5E7EB" stroke-width="28"/>
+      <use href="#FT" transform="translate(288.2 92.4) rotate(59.8)" fill="#E5E7EB" stroke="#1F2937" stroke-width="6"/>
+      <circle cx="-1.8" cy="7.8" r="17" fill="#E5E7EB" stroke="#1F2937" stroke-width="6"/>
+      <circle cx="143.2" cy="50.1" r="15" fill="#E5E7EB" stroke="#1F2937" stroke-width="6"/>
+      <path d="M -170.7,-38.5 L -180.5,-22.3" fill="none" stroke="#1F2937" stroke-width="40"/><path d="M -170.7,-38.5 L -180.5,-22.3" fill="none" stroke="#E5E7EB" stroke-width="28"/>
+      <path d="M -180.5,-22.3 L -180.5,93.7 L -270.4,97.4" fill="none" stroke="#1F2937" stroke-width="40"/><path d="M -180.5,-22.3 L -180.5,93.7 L -270.4,97.4" fill="none" stroke="#E5E7EB" stroke-width="28"/>
+      <circle cx="-180.5" cy="-22.3" r="17" fill="#E5E7EB" stroke="#1F2937" stroke-width="6"/>
+      <circle cx="-180.5" cy="93.7" r="15" fill="#E5E7EB" stroke="#1F2937" stroke-width="6"/>
+      <line x1="-233.1" y1="-52.6" x2="288.2" y2="92.4" stroke="#10B981" stroke-width="4" stroke-dasharray="2 14"/>
+  </g></svg>

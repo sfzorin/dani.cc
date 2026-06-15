@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>pose grid</title>
+<style>body{margin:0;background:#fff;font:11px sans-serif}
+#g{display:grid;grid-template-columns:repeat(8,128px);gap:2px}
+figure{margin:0;background:#eff6ff;border:1px solid #e2e8f0}
+figcaption{padding:1px 4px;color:#555}img{width:128px;height:128px;display:block}</style></head>
+<body><div id="g"></div>
+<script type="importmap">
+{ "imports": { "three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" }}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
+import {joints, neutralPose} from '/body/core.mjs';
+import {POSES} from '/body/poses.mjs';
+const SEX=(new URLSearchParams(location.search).get('sex')==='M')?'M':'F';
+const FOOTREST=[0.78,-0.62,0];
+const mkPose=spec=>{const b=neutralPose();b.Lfoot=FOOTREST.slice();b.Rfoot=FOOTREST.slice();delete b.Lhand;delete b.Rhand;return {...b,...(spec.pose||{})};};
+const toThree=v=>new THREE.Vector3(-v[2],v[1],v[0]);
+const segDir=(J,a,b)=>toThree([J[b][0]-J[a][0],J[b][1]-J[a][1],J[b][2]-J[a][2]]).normalize();
+function aim(bone,child,target){if(!bone||!child)return;bone.updateWorldMatrix(true,false);child.updateWorldMatrix(true,false);
+ const bp=new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld),cp=new THREE.Vector3().setFromMatrixPosition(child.matrixWorld);
+ const cur=cp.sub(bp);if(cur.lengthSq()<1e-12)return;cur.normalize();
+ const q=new THREE.Quaternion().setFromUnitVectors(cur,target.clone().normalize());
+ const bw=new THREE.Quaternion();bone.getWorldQuaternion(bw);const pw=new THREE.Quaternion();if(bone.parent)bone.parent.getWorldQuaternion(pw);
+ bone.quaternion.copy(pw.invert().multiply(q).multiply(bw));bone.updateWorldMatrix(false,true);}
+const SEQ=[['Hips','Spine','pel','chest'],['Spine','Spine1','pel','chest'],['Spine1','Spine2','pel','chest'],['Spine2','Neck','pel','chest'],
+ ['Neck','Head','neck','head'],['Head','HeadTop_End','neck','head'],
+ ['LeftArm','LeftForeArm','shL','elL'],['LeftForeArm','LeftHand','elL','wrL'],['LeftHand','LeftHandMiddle1','wrL','haL'],
+ ['RightArm','RightForeArm','shR','elR'],['RightForeArm','RightHand','elR','wrR'],['RightHand','RightHandMiddle1','wrR','haR'],
+ ['LeftUpLeg','LeftLeg','hipL','knL'],['LeftLeg','LeftFoot','knL','anL'],['LeftFoot','LeftToeBase','anL','toL'],
+ ['RightUpLeg','RightLeg','hipR','knR'],['RightLeg','RightFoot','knR','anR'],['RightFoot','RightToeBase','anR','toR']];
+function orientBody(B,J){const hips=B.Hips;if(!hips)return;
+ const up=toThree([J.chest[0]-J.pel[0],J.chest[1]-J.pel[1],J.chest[2]-J.pel[2]]).normalize();
+ const fwd=toThree(J.front);fwd.sub(up.clone().multiplyScalar(fwd.dot(up))).normalize();
+ const right=new THREE.Vector3().crossVectors(up,fwd).normalize();
+ const m=new THREE.Matrix4().makeBasis(right,up,fwd);const qw=new THREE.Quaternion().setFromRotationMatrix(m);
+ const pq=new THREE.Quaternion();if(hips.parent)hips.parent.getWorldQuaternion(pq);
+ hips.quaternion.copy(pq.invert().multiply(qw));hips.updateWorldMatrix(false,true);}
+function boneBox(B){const box=new THREE.Box3(),v=new THREE.Vector3();for(const k in B){B[k].getWorldPosition(v);box.expandByPoint(v);}return box;}
+function retarget(B,J,headYaw){for(const k in B){const r=B[k].userData&&B[k].userData.rq;if(r)B[k].quaternion.copy(r);}
+ (B.Hips||Object.values(B)[0]).updateWorldMatrix(true,true);
+ orientBody(B,J);
+ for(const[b,c,a,d]of SEQ){if(b==='Hips')continue;aim(B[b],B[c],segDir(J,a,d));}
+ if(B.Head&&headYaw){const up=toThree([J.head[0]-J.neck[0],J.head[1]-J.neck[1],J.head[2]-J.neck[2]]).normalize();B.Head.rotateOnWorldAxis(up,headYaw*Math.PI/180);B.Head.updateWorldMatrix(false,true);}}
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
+renderer.setPixelRatio(1);renderer.setSize(256,256);renderer.setClearColor(0x000000,0);
+const scene=new THREE.Scene();const camera=new THREE.PerspectiveCamera(32,1,0.01,100);
+scene.add(new THREE.HemisphereLight(0xffffff,0xdfe3e8,1.15));
+const k=new THREE.DirectionalLight(0xffffff,1.3);k.position.set(2,4,3);scene.add(k);
+const fl=new THREE.DirectionalLight(0xffffff,0.5);fl.position.set(-2,2,-2);scene.add(fl);
+function fixMat(m){(Array.isArray(m)?m:[m]).forEach(x=>{if(!x)return;if(x.transparent||x.alphaMap||(x.opacity!=null&&x.opacity<1)){x.transparent=false;x.opacity=1;x.depthWrite=true;x.alphaTest=0;x.needsUpdate=true;}});}
+function normalize(root){root.updateMatrixWorld(true);let b=new THREE.Box3().setFromObject(root);const sz=new THREE.Vector3();b.getSize(sz);
+ root.scale.multiplyScalar(1.7/(sz.y||1));root.updateMatrixWorld(true);b=new THREE.Box3().setFromObject(root);const c=new THREE.Vector3();b.getCenter(c);
+ root.position.x-=c.x;root.position.z-=c.z;root.position.y-=b.min.y;root.updateMatrixWorld(true);}
+let floorMesh=null;
+function ground(B,root){root.updateWorldMatrix(true,true);let box=boneBox(B);root.position.y-=(box.min.y-0.045);root.updateWorldMatrix(true,true);
+ box=boneBox(B);const c=new THREE.Vector3();box.getCenter(c);
+ if(floorMesh)scene.remove(floorMesh);floorMesh=new THREE.Mesh(new THREE.BoxGeometry(3,0.02,3),new THREE.MeshBasicMaterial({color:0xcbd5e1}));floorMesh.position.set(c.x,-0.01,c.z);scene.add(floorMesh);}
+function fit(B,view){const box=boneBox(B);box.expandByScalar(0.14);const s=new THREE.Sphere();box.getBoundingSphere(s);
+ const dir=view==='side'?new THREE.Vector3(1,0,0.0001):view==='iso'?new THREE.Vector3(0.7,0.28,0.85):new THREE.Vector3(0,0,1);dir.normalize();
+ const fov=camera.fov*Math.PI/180,dist=s.radius/Math.sin(fov/2)*1.04;camera.position.copy(s.center).addScaledVector(dir,dist);
+ camera.up.set(0,1,0);camera.lookAt(s.center);camera.near=Math.max(0.01,dist-s.radius*2);camera.far=dist+s.radius*2;camera.updateProjectionMatrix();}
+let BONES=null,ROOT=null;
+function ingest(root){const bones={};root.traverse(o=>{if(o.isMesh){fixMat(o.material);o.frustumCulled=false;}if(o.isBone){const kk=o.name.replace(/^mixamorig:?/,'');if(!(kk in bones))bones[kk]=o;}});
+ for(const kk in bones)bones[kk].userData.rq=bones[kk].quaternion.clone();normalize(root);scene.add(root);BONES=bones;ROOT=root;setTimeout(run,2800);} // wait for FBX textures to decode before capture
+const gl=new GLTFLoader(),fb=new FBXLoader();
+function chain(list){if(!list.length){document.title='ERR';return;}const[u,kind]=list[0];(kind==='fbx'?fb:gl).load(u,o=>ingest(kind==='fbx'?o:o.scene),undefined,()=>chain(list.slice(1)));}
+const f=SEX.toLowerCase();
+chain([[`/body/models/${f}.glb`,'glb'],[`/body/models/${f}.fbx`,'fbx'],[SEX==='M'?'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/models/gltf/Soldier.glb':'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/models/gltf/Xbot.glb','glb']]);
+function run(){const g=document.getElementById('g');
+ const only=(new URLSearchParams(location.search).get('ids')||'').split(',').filter(Boolean);
+ const ids=only.length?only:Object.keys(POSES);
+ for(const id of ids){const spec=POSES[id]; if(!spec)continue;retarget(BONES,joints(mkPose(spec),SEX),spec.headYaw||0);
+   if(spec.floor!==false)ground(BONES,ROOT);fit(BONES,spec.view||'front');renderer.render(scene,camera);
+  const url=renderer.domElement.toDataURL('image/png');
+  const fig=document.createElement('figure');fig.innerHTML=`<figcaption>${id} · ${spec.view||'front'}</figcaption><img src="${url}">`;g.appendChild(fig);}
+ document.title='done:'+SEX;window.__done=true;}
+</script></body></html>

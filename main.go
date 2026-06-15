@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"log"
 	"net/http"
 	"os"
@@ -17,6 +18,37 @@ import (
 	"github.com/doors-dev/doors"
 	"github.com/doors-dev/gox"
 )
+
+// bodyHTML is the standalone interactive mannequin editor served at /body.
+//
+//go:embed body/web/body.html
+var bodyHTML []byte
+
+// bodyCore is the shared figure-math ES module imported by the editor (and reused
+// by the Node SVG generator at body/gen.mjs). Served at /body/core.mjs.
+//
+//go:embed body/core.mjs
+var bodyCore []byte
+
+// bodyR3D is the Three.js + Mixamo-rig prototype editor (real 3D), served at /body3d.
+//
+//go:embed body/web/r3d.html
+var bodyR3D []byte
+
+// bodyShot is the headless single-pose figure renderer, served at /body/shot.
+//
+//go:embed body/web/shot.html
+var bodyShot []byte
+
+// bodyPoses is the per-exercise pose table used by the shot renderer.
+//
+//go:embed body/poses.mjs
+var bodyPoses []byte
+
+// bodyShotGrid renders every pose to a contact sheet (review tool), served at /body/shotgrid.
+//
+//go:embed body/web/shotgrid.html
+var bodyShotGrid []byte
 
 func main() {
 	dbPath := os.Getenv("DANI_DB")
@@ -73,9 +105,41 @@ func main() {
 	// Serve embedded static files (icons, manifest, service worker, exercise SVGs).
 	a.Use(doors.UseFS("/static", assets.Static(), doors.CacheControlStatic))
 
+	// /body — standalone interactive 3D mannequin editor (separate from the workout app).
+	mux := http.NewServeMux()
+	mux.HandleFunc("/body", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(bodyHTML)
+	})
+	mux.HandleFunc("/body/core.mjs", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+		w.Write(bodyCore)
+	})
+	mux.HandleFunc("/body3d", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(bodyR3D)
+	})
+	mux.HandleFunc("/body/shot", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(bodyShot)
+	})
+	mux.HandleFunc("/body/poses.mjs", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+		w.Write(bodyPoses)
+	})
+	mux.HandleFunc("/body/shotgrid", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(bodyShotGrid)
+	})
+	// /body/models/ — drop-in GLB mannequins (e.g. m.glb / f.glb exported from Mixamo),
+	// served from disk so swapping a model needs no rebuild. The 3D editor loads these
+	// first and falls back to CDN stand-ins if absent.
+	mux.Handle("/body/models/", http.StripPrefix("/body/models/", http.FileServer(http.Dir("body/web/models"))))
+	mux.Handle("/", a)
+
 	addr := ":8080"
 	log.Printf("dani listening on %s", addr)
-	if err := http.ListenAndServe(addr, a); err != nil {
+	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal(err)
 	}
 }

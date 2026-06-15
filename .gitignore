@@ -21,3 +21,7 @@ vendor/
 
 # Node (if using Tailwind via npm)
 node_modules/
+
+# 3D mannequin source meshes (large Mixamo FBX/GLB drop-ins; served from disk, not embedded)
+body/web/models/*.fbx
+body/web/models/*.glb

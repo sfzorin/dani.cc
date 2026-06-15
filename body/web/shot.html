@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8">
+<title>body shot — headless pose renderer</title>
+<style>html,body{margin:0;background:transparent}#c{display:block}</style>
+</head>
+<body>
+<div id="c"></div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
+import {joints, neutralPose} from '/body/core.mjs';
+import {POSES} from '/body/poses.mjs';
+
+const qs=new URLSearchParams(location.search);
+const ID = qs.get('id') || '_neutral';
+const SEX = (qs.get('sex')==='M') ? 'M' : 'F';
+const SIZE = +qs.get('size') || 512;
+const spec = POSES[ID] || POSES._neutral || {view:'front'};
+
+// ---- pose: merge spec over the flat-foot neutral ----
+const FOOTREST=[0.78,-0.62,0];
+const base=neutralPose(); base.Lfoot=FOOTREST.slice(); base.Rfoot=FOOTREST.slice();
+delete base.Lhand; delete base.Rhand;            // hands follow the forearm (joints: hand||fa) — no helpless droop
+const pose={...base, ...(spec.pose||{})};
+const headYaw = spec.headYaw||0;
+
+// ===================== retarget joints()→rig (same as editor) =====================
+const toThree = v => new THREE.Vector3(-v[2], v[1], v[0]);
+const segDir = (J,a,b) => toThree([J[b][0]-J[a][0], J[b][1]-J[a][1], J[b][2]-J[a][2]]).normalize();
+function aim(bone, child, target){
+  if(!bone || !child) return;
+  bone.updateWorldMatrix(true,false); child.updateWorldMatrix(true,false);
+  const bp=new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld);
+  const cp=new THREE.Vector3().setFromMatrixPosition(child.matrixWorld);
+  const cur=cp.sub(bp); if(cur.lengthSq()<1e-12) return; cur.normalize();
+  const q=new THREE.Quaternion().setFromUnitVectors(cur, target.clone().normalize());
+  const bw=new THREE.Quaternion(); bone.getWorldQuaternion(bw);
+  const pw=new THREE.Quaternion(); if(bone.parent) bone.parent.getWorldQuaternion(pw);
+  bone.quaternion.copy(pw.invert().multiply(q).multiply(bw)); bone.updateWorldMatrix(false,true);
+}
+const SEQ=[
+ ['Hips','Spine','pel','chest'],['Spine','Spine1','pel','chest'],['Spine1','Spine2','pel','chest'],['Spine2','Neck','pel','chest'],
+ ['Neck','Head','neck','head'],['Head','HeadTop_End','neck','head'],
+ ['LeftArm','LeftForeArm','shL','elL'],['LeftForeArm','LeftHand','elL','wrL'],['LeftHand','LeftHandMiddle1','wrL','haL'],
+ ['RightArm','RightForeArm','shR','elR'],['RightForeArm','RightHand','elR','wrR'],['RightHand','RightHandMiddle1','wrR','haR'],
+ ['LeftUpLeg','LeftLeg','hipL','knL'],['LeftLeg','LeftFoot','knL','anL'],['LeftFoot','LeftToeBase','anL','toL'],
+ ['RightUpLeg','RightLeg','hipR','knR'],['RightLeg','RightFoot','knR','anR'],['RightFoot','RightToeBase','anR','toR'],
+];
+// Orient the Hips by a FULL basis: up = body axis (pelvis→chest), fwd = belly (`front`).
+// aim() only sets bone DIRECTION, not roll, so without this the belly faces a random way
+// (face-up planks). This pins the torso roll so the back is up / belly faces `front`.
+function orientBody(B,J){
+  const hips=B.Hips; if(!hips) return;
+  const up=toThree([J.chest[0]-J.pel[0],J.chest[1]-J.pel[1],J.chest[2]-J.pel[2]]).normalize();
+  const fwd=toThree(J.front); fwd.sub(up.clone().multiplyScalar(fwd.dot(up))).normalize();
+  const right=new THREE.Vector3().crossVectors(up,fwd).normalize();
+  const m=new THREE.Matrix4().makeBasis(right,up,fwd);
+  const qw=new THREE.Quaternion().setFromRotationMatrix(m);
+  const pq=new THREE.Quaternion(); if(hips.parent) hips.parent.getWorldQuaternion(pq);
+  hips.quaternion.copy(pq.invert().multiply(qw)); hips.updateWorldMatrix(false,true);
+}
+function retarget(B,J){
+  for(const k in B){const r=B[k].userData&&B[k].userData.rq; if(r) B[k].quaternion.copy(r);}
+  (B.Hips||Object.values(B)[0]).updateWorldMatrix(true,true);
+  orientBody(B,J);                                   // pin torso roll (back up) BEFORE limb aims
+  for(const [b,c,a,d] of SEQ){ if(b==='Hips') continue; aim(B[b],B[c],segDir(J,a,d)); }
+  if(B.Head && headYaw){const up=toThree([J.head[0]-J.neck[0],J.head[1]-J.neck[1],J.head[2]-J.neck[2]]).normalize();
+    B.Head.rotateOnWorldAxis(up, headYaw*Math.PI/180); B.Head.updateWorldMatrix(false,true);}
+}
+
+// ===================== three.js (transparent bg, textured/clothed) =====================
+const renderer=new THREE.WebGLRenderer({antialias:true, alpha:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(2); renderer.setSize(SIZE,SIZE); renderer.setClearColor(0x000000,0);
+document.getElementById('c').appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(32,1,0.01,100);
+scene.add(new THREE.HemisphereLight(0xffffff,0xdfe3e8,1.15));
+const key=new THREE.DirectionalLight(0xffffff,1.3); key.position.set(2,4,3); scene.add(key);
+const fill=new THREE.DirectionalLight(0xffffff,0.5); fill.position.set(-2,2,-2); scene.add(fill);
+
+function fixMat(m){ (Array.isArray(m)?m:[m]).forEach(x=>{ if(!x) return;
+  if(x.transparent || x.alphaMap || (x.opacity!=null && x.opacity<1)){ x.transparent=false; x.opacity=1; x.depthWrite=true; x.alphaTest=0; x.needsUpdate=true; } }); }
+function normalize(root){
+  root.updateMatrixWorld(true);
+  let b=new THREE.Box3().setFromObject(root); const sz=new THREE.Vector3(); b.getSize(sz);
+  root.scale.multiplyScalar(1.7/(sz.y||1)); root.updateMatrixWorld(true);
+  b=new THREE.Box3().setFromObject(root); const c=new THREE.Vector3(); b.getCenter(c);
+  root.position.x-=c.x; root.position.z-=c.z; root.position.y-=b.min.y; root.updateMatrixWorld(true);
+}
+let floorMesh=null;
+// Box3.setFromObject ignores skinning (returns BIND-pose bounds), so compute the real posed
+// bounds from the BONE world positions instead.
+function boneBox(B){const box=new THREE.Box3(),v=new THREE.Vector3();for(const k in B){B[k].getWorldPosition(v);box.expandByPoint(v);}return box;}
+function addFloor(B,root){
+  root.updateWorldMatrix(true,true);
+  let box=boneBox(B);
+  root.position.y -= (box.min.y - 0.045);              // lowest joint sits ~flesh-height above floor
+  root.updateWorldMatrix(true,true);
+  box=boneBox(B); const c=new THREE.Vector3(); box.getCenter(c);
+  if(floorMesh) scene.remove(floorMesh);
+  floorMesh=new THREE.Mesh(new THREE.BoxGeometry(3,0.02,3), new THREE.MeshBasicMaterial({color:0xcbd5e1}));
+  floorMesh.position.set(c.x,-0.01,c.z); scene.add(floorMesh);
+}
+function fitCamera(B, view){
+  const box=boneBox(B); box.expandByScalar(0.14);      // margin for flesh beyond the joints
+  const sph=new THREE.Sphere(); box.getBoundingSphere(sph);
+  const dir = view==='side' ? new THREE.Vector3(1,0,0.0001)
+            : view==='iso'  ? new THREE.Vector3(0.7,0.28,0.85)
+            : new THREE.Vector3(0,0,1);
+  dir.normalize();
+  const fov=camera.fov*Math.PI/180, dist=sph.radius/Math.sin(fov/2)*1.04;
+  camera.position.copy(sph.center).addScaledVector(dir,dist);
+  camera.up.set(0,1,0); camera.lookAt(sph.center);
+  camera.near=Math.max(0.01,dist-sph.radius*2); camera.far=dist+sph.radius*2; camera.updateProjectionMatrix();
+}
+
+const gltfL=new GLTFLoader(), fbxL=new FBXLoader();
+function ingest(root){
+  const bones={};
+  root.traverse(o=>{ if(o.isMesh){fixMat(o.material);o.frustumCulled=false;}
+    if(o.isBone){const k=o.name.replace(/^mixamorig:?/,''); if(!(k in bones)) bones[k]=o;} });
+  for(const k in bones) bones[k].userData.rq=bones[k].quaternion.clone();
+  normalize(root); scene.add(root);
+  retarget(bones, joints(pose,SEX));
+  fitCamera(bones, spec.view||'front');
+  renderer.render(scene,camera);
+  composite();
+  window.__shotReady=true; document.title='ready:'+ID+':'+SEX;
+}
+// Compose to a 2D canvas and put the floor line at the figure's LOWEST OPAQUE PIXEL — align
+// by the picture, not by bones (bones ignore the flesh, so the figure looked like it floated).
+const out=document.createElement('canvas'); out.width=SIZE; out.height=SIZE;
+document.body.appendChild(out); const octx=out.getContext('2d',{willReadFrequently:true});
+function composite(){
+  octx.clearRect(0,0,SIZE,SIZE); octx.drawImage(renderer.domElement,0,0,SIZE,SIZE);
+  const d=octx.getImageData(0,0,SIZE,SIZE).data; let bottom=-1,left=SIZE,right=0;
+  for(let y=SIZE-1;y>=0;y--){let hit=false;for(let x=0;x<SIZE;x++){if(d[(y*SIZE+x)*4+3]>24){hit=true;if(x<left)left=x;if(x>right)right=x;}}if(hit){if(bottom<0)bottom=y;}}
+  if(bottom>=0 && spec.floor!==false){const fy=Math.min(SIZE-3,bottom+1);
+    octx.strokeStyle='#475569';octx.lineWidth=4;octx.lineCap='round';
+    octx.beginPath();octx.moveTo(Math.max(6,left-24),fy);octx.lineTo(Math.min(SIZE-6,right+24),fy);octx.stroke();}
+}
+function chain(list){
+  if(!list.length){ document.title='ERROR'; window.__shotErr=true; return; }
+  const [url,kind]=list[0]; const L=kind==='fbx'?fbxL:gltfL;
+  L.load(url, obj=>ingest(kind==='fbx'?obj:obj.scene), undefined, ()=>chain(list.slice(1)));
+}
+const f=SEX.toLowerCase();
+chain([[`/body/models/${f}.glb`,'glb'],[`/body/models/${f}.fbx`,'fbx'],
+  [SEX==='M'?'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/models/gltf/Soldier.glb'
+            :'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/models/gltf/Xbot.glb','glb']]);
+renderer.domElement.style.display='none';            // show only the composited 2D canvas
+renderer.setAnimationLoop(()=>{ renderer.render(scene,camera); composite(); });
+</script>
+</body></html>

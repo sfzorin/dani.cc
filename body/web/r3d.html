@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>body 3D — редактор</title>
+<style>
+ :root{--ink:#1F2937;--acc:#2563EB;--line:#e2e8f0}
+ *{box-sizing:border-box}
+ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1f2937;background:#fafafa}
+ header{padding:12px 18px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+ h1{font-size:16px;font-weight:600;margin:0}
+ .ctl{display:flex;gap:8px;align-items:center;font-size:13px;color:#475569}
+ .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+ .seg button{border:0;background:#fff;padding:7px 12px;font-size:13px;cursor:pointer}
+ .seg button.on{background:var(--acc);color:#fff}
+ button.plain{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer}
+ .stage{display:flex;gap:14px;padding:14px;align-items:flex-start}
+ .big{flex:1 1 auto;min-width:340px;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}
+ .big .cap{font-size:12px;color:#64748b;padding:6px 10px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+ #viewport{width:100%;height:72vh;position:relative}
+ #viewport canvas{display:block;width:100%;height:100%;cursor:grab}
+ #hud{position:absolute;left:8px;top:8px;font:11px monospace;color:#64748b;background:#ffffffcc;padding:3px 7px;border-radius:6px;pointer-events:none}
+ .minis{display:flex;flex-direction:column;gap:10px;width:230px;flex:0 0 auto}
+ .panel{border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}
+ .panel .cap{font-size:11px;color:#64748b;padding:5px 9px;border-bottom:1px solid var(--line)}
+ svg{width:100%;height:auto;display:block;touch-action:none}
+ .h{fill:rgba(37,99,235,.35);stroke:var(--acc);stroke-width:1.5;cursor:grab}
+ .h:hover{fill:rgba(37,99,235,.6)}
+ .hint{padding:0 18px 16px;color:#64748b;font-size:12px;max-width:980px}
+</style></head>
+<body>
+<header>
+ <h1>body 3D — редактор</h1>
+ <div class="ctl">пол
+  <div class="seg" id="sex"><button data-s="M">М</button><button data-s="F" class="on">Ж</button></div>
+ </div>
+ <div class="ctl">стиль
+  <div class="seg" id="style"><button data-st="orig" class="on">Цвет</button><button data-st="toon">Контур</button></div>
+ </div>
+ <div class="ctl">ракурс
+  <div class="seg" id="cam">
+   <button data-c="iso" class="on">¾</button><button data-c="front">спереди</button>
+   <button data-c="side">сбоку</button><button data-c="top">сверху</button>
+  </div>
+ </div>
+ <div class="ctl">голова <input type="range" id="hyaw" min="-80" max="80" step="1" value="0" style="width:110px"><span id="hyawv" style="width:34px;display:inline-block">0°</span></div>
+ <button class="plain" id="toggleH">Скрыть точки</button>
+ <button class="plain" id="reset">Сбросить позу</button>
+</header>
+<div class="stage">
+ <div class="big">
+   <div class="cap"><span>3D — тяни мышью, чтобы покрутить · колесо — зум</span><span id="status">загрузка…</span></div>
+   <div id="viewport"><div id="hud"></div></div>
+ </div>
+ <div class="minis">
+  <div class="panel"><div class="cap">вид сбоку</div><svg id="side" viewBox="0 0 360 470"></svg></div>
+  <div class="panel"><div class="cap">вид спереди</div><svg id="front" viewBox="0 0 360 470"></svg></div>
+  <div class="panel"><div class="cap">вид сверху</div><svg id="top" viewBox="0 0 360 470"></svg></div>
+ </div>
+</div>
+<p class="hint">Большое окно — настоящий 3D-манекен (риг Mixamo, поза задаётся нашим скелетом). В маленьких проекциях тяни синие узлы (голова, локти, запястья, кисти, колени, лодыжки, носки, грудь, таз) — длины костей и ограничения суставов держатся автоматически, 3D обновляется сразу. М/Ж меняет модель.</p>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
+import {OutlineEffect} from 'three/addons/effects/OutlineEffect.js';
+import {joints, skeletonSVG, VIEWS, project, neutralPose} from '/body/core.mjs';
+
+// ============================ state ============================
+let SEX='F', SHOWH=true, headYaw=0;   // headYaw = head turn (deg, left/right) about its up-axis
+// Editor-local neutral: feet point fwd+down to match the Mixamo rig's flat rest foot (rig
+// rest ankle→toe ≈ this), so at neutral the foot sits flat AND stays drag-rotatable.
+const FOOTREST=[0.78,-0.62,0];
+const freshPose=()=>{const p=neutralPose(); p.Lfoot=FOOTREST.slice(); p.Rfoot=FOOTREST.slice(); return p;};
+let pose=freshPose();
+const statusEl=document.getElementById('status'), hud=document.getElementById('hud');
+
+// ===================== mini editing panels =====================
+// (reuse the proven SVG-skeleton drag editor; it drives `pose`, the 3D mirrors it)
+const SC=.55, CX=180, CYV={side:400,front:400,top:235}, r1=x=>Math.round(x*10)/10;
+const w2s=(p,view)=>{const a=project(p,VIEWS[view]);return[CX+SC*a[0], CYV[view]+SC*a[1]];};
+const s2proj=(mx,my,view)=>[(mx-CX)/SC,(my-CYV[view])/SC];
+const CTRL={elL:['Luarm','shL'],wrL:['Lfarm','elL'],haL:['Lhand','wrL'],toL:['Lfoot','anL'],knL:['Lthigh','hipL'],anL:['Lshin','knL'],
+ elR:['Ruarm','shR'],wrR:['Rfarm','elR'],haR:['Rhand','wrR'],toR:['Rfoot','anR'],knR:['Rthigh','hipR'],anR:['Rshin','knR'],
+ head:['head','neck'],chest:['spine','pel'],pel:['ROOT',null]};
+function handles(J,view){let s='';for(const k in CTRL){const[x,y]=w2s(J[k],view);
+ s+=`<circle class="h" cx="${r1(x)}" cy="${r1(y)}" r="9" data-j="${k}" data-v="${view}"/>`;}return s;}
+function floor(view){return view==='top'?'':`<line x1="20" y1="400" x2="340" y2="400" stroke="#1F2937" stroke-width="2" stroke-linecap="round" opacity="0.4"/>`;}
+function drawMini(J,view){document.getElementById(view).innerHTML=
+ `${floor(view)}${skeletonSVG(J,VIEWS[view],{xf:{sc:SC,tx:CX,ty:CYV[view]}})}${SHOWH?handles(J,view):''}`;}
+function drawMinis(){const J=joints(pose,SEX); for(const v of['side','front','top'])drawMini(J,v);}
+
+let drag=null;
+function svgPoint(svg,e){const r=svg.getBoundingClientRect();const vb=svg.viewBox.baseVal;
+ return[(e.clientX-r.left)/r.width*vb.width,(e.clientY-r.top)/r.height*vb.height];}
+function onDown(e){const t=e.target;if(!t.classList||!t.classList.contains('h'))return;drag={j:t.dataset.j,view:t.dataset.v};e.preventDefault();}
+function onMove(e){if(!drag)return;const svg=document.getElementById(drag.view);
+ const[mx,my]=svgPoint(svg,e);const[px,py]=s2proj(mx,my,drag.view);const J=joints(pose,SEX);const cur=J[drag.j];
+ let world; if(drag.view==='side')world=[px,-py,cur[2]];else if(drag.view==='front')world=[cur[0],-py,px];else world=[-py,cur[1],px];
+ const[bone,parent]=CTRL[drag.j];
+ if(bone==='ROOT')pose.pelvis=world;
+ else{const Pp=J[parent];const d=[world[0]-Pp[0],world[1]-Pp[1],world[2]-Pp[2]];const m=Math.hypot(d[0],d[1],d[2])||1;pose[bone]=[d[0]/m,d[1]/m,d[2]/m];}
+ update();e.preventDefault();}
+['side','front','top'].forEach(v=>document.getElementById(v).addEventListener('pointerdown',onDown));
+window.addEventListener('pointermove',onMove); window.addEventListener('pointerup',()=>drag=null);
+
+// ===================== retarget joints()→rig =====================
+// our space (x=front,y=up,z=left) → three space via Ry(-90): [-z, y, x]
+const toThree = v => new THREE.Vector3(-v[2], v[1], v[0]);
+const segDir = (J,a,b) => toThree([J[b][0]-J[a][0], J[b][1]-J[a][1], J[b][2]-J[a][2]]).normalize();
+function aim(bone, child, target){
+  if(!bone || !child) return;
+  bone.updateWorldMatrix(true,false);
+  child.updateWorldMatrix(true,false);                 // child must be fresh or `cur` is stale
+  const bp = new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld);
+  const cp = new THREE.Vector3().setFromMatrixPosition(child.matrixWorld);
+  const cur = cp.sub(bp);
+  if(cur.lengthSq() < 1e-12) return; cur.normalize();
+  const q  = new THREE.Quaternion().setFromUnitVectors(cur, target.clone().normalize());
+  const bw = new THREE.Quaternion(); bone.getWorldQuaternion(bw);
+  const pw = new THREE.Quaternion(); if(bone.parent) bone.parent.getWorldQuaternion(pw);
+  bone.quaternion.copy(pw.invert().multiply(q).multiply(bw));
+  bone.updateWorldMatrix(false,true);
+}
+const SEQ = [
+ ['Hips','Spine','pel','chest'], ['Spine','Spine1','pel','chest'],
+ ['Spine1','Spine2','pel','chest'], ['Spine2','Neck','pel','chest'],
+ ['Neck','Head','neck','head'], ['Head','HeadTop_End','neck','head'],
+ ['LeftArm','LeftForeArm','shL','elL'], ['LeftForeArm','LeftHand','elL','wrL'], ['LeftHand','LeftHandMiddle1','wrL','haL'],
+ ['RightArm','RightForeArm','shR','elR'], ['RightForeArm','RightHand','elR','wrR'], ['RightHand','RightHandMiddle1','wrR','haR'],
+ ['LeftUpLeg','LeftLeg','hipL','knL'], ['LeftLeg','LeftFoot','knL','anL'], ['LeftFoot','LeftToeBase','anL','toL'],
+ ['RightUpLeg','RightLeg','hipR','knR'], ['RightLeg','RightFoot','knR','anR'], ['RightFoot','RightToeBase','anR','toR'],
+];
+function retarget(B, J){
+  for(const k in B){ const r=B[k].userData&&B[k].userData.rq; if(r) B[k].quaternion.copy(r); }   // reset to rest → deterministic, no roll accumulation
+  (B.Hips||Object.values(B)[0]).updateWorldMatrix(true,true);
+  for(const [b,c,a,d] of SEQ) aim(B[b], B[c], segDir(J,a,d));
+  if(B.Head && headYaw){                                  // turn the face left/right about the head's up-axis
+    const up=toThree([J.head[0]-J.neck[0],J.head[1]-J.neck[1],J.head[2]-J.neck[2]]).normalize();
+    B.Head.rotateOnWorldAxis(up, headYaw*Math.PI/180); B.Head.updateWorldMatrix(false,true);
+  } }
+
+// ============================ three.js ============================
+const viewport=document.getElementById('viewport');
+const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setClearColor(0xffffff, 1);
+viewport.appendChild(renderer.domElement);
+const effect = new OutlineEffect(renderer, {defaultThickness:0.0055, defaultColor:[0.122,0.161,0.216], defaultAlpha:1});
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+const controls = new OrbitControls(camera, renderer.domElement);
+const TARGET=new THREE.Vector3(0,0.95,0);
+const PRE={iso:[2.6,1.5,2.9],front:[0,1.0,4.2],side:[4.2,1.0,0.02],top:[0.02,5.0,0.02]};
+function setCam(k){const p=PRE[k]||PRE.iso;camera.position.set(p[0],p[1],p[2]);controls.target.copy(TARGET);controls.update();}
+setCam('iso');
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0xdfe3e8, 1.1));
+const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(2,4,3); scene.add(key);
+
+// 2-step toon ramp → flat schematic grey fill
+const ramp = new THREE.DataTexture(new Uint8Array([180,180,180,255, 235,235,235,255]), 2,1, THREE.RGBAFormat);
+ramp.needsUpdate = true; ramp.magFilter = THREE.NearestFilter; ramp.minFilter = THREE.NearestFilter;
+const toon = new THREE.MeshToonMaterial({color:0xE5E7EB, gradientMap:ramp});
+let STYLE='orig';                                    // 'orig' = imported textures, 'toon' = flat grey schematic
+// Mixamo hair/eyelash materials import as semi-transparent → render see-through. Make them
+// opaque with alpha-cutout so hair reads solid.
+function fixMat(m){ (Array.isArray(m)?m:[m]).forEach(x=>{ if(!x) return;
+  // Hair: render FULLY OPAQUE, no alpha at all — no blend (→ not see-through) and no cutout
+  // (→ not bald). Simplest robust fix; the hair geometry just renders solid with its colour map.
+  if(x.transparent || x.alphaMap || (x.opacity!=null && x.opacity<1)){
+    x.transparent=false; x.opacity=1; x.depthWrite=true; x.alphaTest=0; x.needsUpdate=true; } }); }
+function applyStyle(root){ root.traverse(o=>{ if(o.isMesh && o.userData.orig) o.material = STYLE==='toon' ? toon : o.userData.orig; }); }
+function styleAll(){ for(const k in cache) applyStyle(cache[k].root); }
+
+function fitSize(){const w=viewport.clientWidth||1,h=viewport.clientHeight||1;
+ renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+new ResizeObserver(fitSize).observe(viewport); fitSize();
+
+// ===================== model loading (M/F, cached) =====================
+// Drop a Mixamo export into body/web/models/{m,f}.{glb,fbx} and it's used automatically
+// (FBX loads straight from Mixamo — no conversion). Until then we fall back to three.js
+// example meshes (Xbot ≈ Ж, Soldier = заглушка М). Any source is auto-normalized to a
+// ~1.7-unit standing figure with feet on the floor, so the camera framing stays constant.
+const CDN={
+ M:'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/models/gltf/Soldier.glb',
+ F:'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/models/gltf/Xbot.glb',
+};
+const gltfL=new GLTFLoader(), fbxL=new FBXLoader();
+const cache={};            // sex → {root,bones,src}
+let curBones=null;
+const RAW=new URLSearchParams(location.search).has('raw');   // ?raw=1 → skip retarget (show rig rest pose)
+const DIAG=new URLSearchParams(location.search).has('diag');
+function diag(B){const J=joints(pose,SEX);          // ?diag=1 → show achieved limb dirs vs targets
+ const wd=(a,c)=>{if(!B[a]||!B[c])return'?';const A=new THREE.Vector3().setFromMatrixPosition(B[a].matrixWorld),C=new THREE.Vector3().setFromMatrixPosition(B[c].matrixWorld);const v=C.sub(A).normalize();return`${v.x.toFixed(2)},${v.y.toFixed(2)},${v.z.toFixed(2)}`;};
+ const t=segDir(J,'shR','elR');
+ hud.textContent=`footR[${wd('RightFoot','RightToeBase')}] footL[${wd('LeftFoot','LeftToeBase')}] | shinR[${wd('RightLeg','RightFoot')}]`;}
+function applyPose(){ if(curBones){ if(!RAW) retarget(curBones, joints(pose,SEX)); if(DIAG) diag(curBones); } }
+function update(){ drawMinis(); applyPose(); }
+
+function swapTo(sex){
+ for(const k in cache) cache[k].root.visible = (k===sex);
+ curBones=cache[sex].bones; applyPose();
+ statusEl.textContent='модель: '+(sex==='M'?'М':'Ж')+(cache[sex].src==='local'?'':' (заглушка)');
+ if(!DIAG) hud.textContent='bones: '+Object.keys(curBones).length;
+}
+function normalize(root){            // scale to ~1.7 tall, centre x/z, feet at y=0
+ root.updateMatrixWorld(true);
+ let b=new THREE.Box3().setFromObject(root); const sz=new THREE.Vector3(); b.getSize(sz);
+ root.scale.multiplyScalar(1.7/(sz.y||1)); root.updateMatrixWorld(true);
+ b=new THREE.Box3().setFromObject(root); const c=new THREE.Vector3(); b.getCenter(c);
+ root.position.x-=c.x; root.position.z-=c.z; root.position.y-=b.min.y; root.updateMatrixWorld(true);
+}
+function ingest(sex,src,root){
+ const bones={};
+ // Mixamo FBX (via FBXLoader) can stack duplicate same-named bones (RightArm→RightArm…).
+ // traverse is parent-first, so keep the FIRST = uppermost — rotating it swings the whole
+ // limb (keeping the last grabbed a leaf node, so only the lower segment bent → splayed arms).
+ root.traverse(o=>{ if(o.isMesh){fixMat(o.material);o.userData.orig=o.material;o.frustumCulled=false;}
+   if(o.isBone){const k=o.name.replace(/^mixamorig:?/,''); if(!(k in bones)) bones[k]=o;} });
+ for(const k in bones) bones[k].userData.rq=bones[k].quaternion.clone();   // rest local rotation (for deterministic retarget)
+ applyStyle(root); normalize(root); scene.add(root); cache[sex]={root,bones,src}; swapTo(sex);
+ if(new URLSearchParams(location.search).has('bones')){
+   const need=['Hips','Spine','Spine1','Spine2','Neck','Head','HeadTop_End','LeftArm','LeftForeArm','LeftHand','LeftHandMiddle1','LeftUpLeg','LeftLeg','LeftFoot','LeftToeBase'];
+   const miss=need.filter(n=>!bones[n]);
+   hud.textContent=`bones:${Object.keys(bones).length} | missing SEQ: ${miss.join(',')||'none'} | sample: ${Object.keys(bones).slice(0,6).join(',')}`;
+ }
+}
+// try a chain of [url, kind] sources, fall through on error
+function chain(sex, list){
+ if(!list.length){ statusEl.textContent='ошибка загрузки модели'; hud.textContent='LOAD ERROR'; return; }
+ const [url,kind]=list[0], src=url.startsWith('/body/models')?'local':'cdn';
+ const L=kind==='fbx'?fbxL:gltfL;
+ L.load(url, obj=>ingest(sex, src, kind==='fbx'?obj:obj.scene), undefined, ()=>chain(sex,list.slice(1)));
+}
+function loadModel(sex){
+ if(cache[sex]){ swapTo(sex); return; }
+ statusEl.textContent='загрузка…'; const f=sex.toLowerCase();
+ chain(sex, [[`/body/models/${f}.glb`,'glb'],[`/body/models/${f}.fbx`,'fbx'],[CDN[sex],'glb']]);
+}
+
+// ============================ controls ============================
+const segPick=(id,fn)=>document.getElementById(id).addEventListener('click',e=>{const b=e.target;if(!b.dataset)return;
+ [...e.currentTarget.children].forEach(x=>x.classList.toggle('on',x===b)); fn(b);});
+segPick('sex',b=>{if(!b.dataset.s)return;SEX=b.dataset.s;loadModel(SEX);drawMinis();});
+segPick('style',b=>{if(!b.dataset.st)return;STYLE=b.dataset.st;styleAll();});
+segPick('cam',b=>{if(!b.dataset.c)return;setCam(b.dataset.c);});
+document.getElementById('hyaw').addEventListener('input',e=>{headYaw=+e.target.value;document.getElementById('hyawv').textContent=headYaw+'°';applyPose();});
+document.getElementById('reset').addEventListener('click',()=>{pose=freshPose();headYaw=0;document.getElementById('hyaw').value=0;document.getElementById('hyawv').textContent='0°';update();});
+document.getElementById('toggleH').addEventListener('click',e=>{SHOWH=!SHOWH;e.target.textContent=SHOWH?'Скрыть точки':'Показать точки';drawMinis();});
+
+// ============================ boot ============================
+const qs=new URLSearchParams(location.search);
+const q0=qs.get('sex');
+if(q0==='M'||q0==='F'){ SEX=q0; for(const b of document.querySelectorAll('#sex button')) b.classList.toggle('on', b.dataset.s===SEX); }
+const q1=qs.get('style');
+if(q1==='toon'||q1==='orig'){ STYLE=q1; for(const b of document.querySelectorAll('#style button')) b.classList.toggle('on', b.dataset.st===STYLE); }
+const q2=qs.get('hyaw');
+if(q2!=null){ headYaw=Math.max(-80,Math.min(80,+q2||0)); document.getElementById('hyaw').value=headYaw; document.getElementById('hyawv').textContent=headYaw+'°'; }
+if(qs.get('demo')==='1'){ pose={...pose, Ruarm:[1,0,0],Rfarm:[1,0,0],Rhand:[0,1,0]}; } // arm fwd, hand bent up (hand-retarget check)
+drawMinis();
+loadModel(SEX);
+// outline only for the flat «Контур» schematic; in «Цвет» it muddies the textured model
+renderer.setAnimationLoop(()=>{ controls.update(); STYLE==='toon' ? effect.render(scene, camera) : renderer.render(scene, camera); });
+window.__ready=true;
+</script>
+</body></html>
