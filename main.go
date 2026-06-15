@@ -46,9 +46,14 @@ var bodyPoses []byte
 var bodyShotGrid []byte
 
 func main() {
-	dbPath := os.Getenv("DANI_DB")
+	// MORNING_DB is what the container (Dockerfile / docker-compose) sets to the
+	// persistent /data volume; DANI_DB is kept as a legacy fallback.
+	dbPath := os.Getenv("MORNING_DB")
 	if dbPath == "" {
-		dbPath = "dani.db"
+		dbPath = os.Getenv("DANI_DB")
+	}
+	if dbPath == "" {
+		dbPath = "morning.db"
 	}
 	database, err := db.Open(dbPath)
 	if err != nil {
