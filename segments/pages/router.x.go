@@ -6,8 +6,8 @@
 package pages
 
 import (
-	"danicc/internal/auth"
-	"danicc/path"
+	"morning30/internal/auth"
+	"morning30/path"
 
 	"github.com/doors-dev/doors"
 	"github.com/doors-dev/gox"

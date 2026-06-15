@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"sort"
 
-	"danicc/internal/content"
-	"danicc/internal/i18n"
+	"morning30/internal/content"
+	"morning30/internal/i18n"
 )
 
 // VoiceDoc are the non-blocking voice cues for one language.

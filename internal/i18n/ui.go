@@ -3,7 +3,7 @@ package i18n
 // ui maps a string key to translations in Order = [ru, en, tr, de, es, fr, it].
 var ui = map[string][7]string{
 	// App / brand
-	"app.name":    {"dani.cc", "dani.cc", "dani.cc", "dani.cc", "dani.cc", "dani.cc", "dani.cc"},
+	"app.name":    {"morning30.com", "morning30.com", "morning30.com", "morning30.com", "morning30.com", "morning30.com", "morning30.com"},
 	"app.tagline": {"Утренняя зарядка за 30 дней", "30-day morning workout", "30 günlük sabah egzersizi", "30-Tage-Morgenworkout", "Rutina matutina de 30 días", "Routine matinale de 30 jours", "Allenamento mattutino di 30 giorni"},
 
 	// Guest mode

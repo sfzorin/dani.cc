@@ -4,9 +4,9 @@ package app
 import (
 	"time"
 
-	"danicc/internal/catalog"
-	"danicc/internal/content"
-	"danicc/internal/db"
+	"morning30/internal/catalog"
+	"morning30/internal/content"
+	"morning30/internal/db"
 )
 
 // DB is the application database, set once at startup in main.

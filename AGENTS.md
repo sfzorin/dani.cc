@@ -32,10 +32,10 @@ export GH_TOKEN="$GH_TOKEN_SFZORIN"
 
 # Project Notes
 
-This project is deployed to `dani.cc` from:
+This project is deployed to `morning30.com` from:
 
 ```text
-https://github.com/sfzorin/dani.cc
+https://github.com/sfzorin/morning30
 ```
 
 Do not commit local databases, deploy keys, secrets, or generated runtime state:

@@ -7,10 +7,10 @@ import (
 	"context"
 	"net/http"
 
-	"danicc/internal/app"
-	"danicc/internal/auth"
-	"danicc/internal/i18n"
-	"danicc/path"
+	"morning30/internal/app"
+	"morning30/internal/auth"
+	"morning30/internal/i18n"
+	"morning30/path"
 
 	"github.com/doors-dev/doors"
 	"github.com/doors-dev/gox"

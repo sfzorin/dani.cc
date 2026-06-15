@@ -5,11 +5,11 @@
 package main
 
 import (
-	"danicc/assets"
-	"danicc/components"
-	"danicc/internal/auth"
-	"danicc/path"
-	"danicc/segments/pages"
+	"morning30/assets"
+	"morning30/components"
+	"morning30/internal/auth"
+	"morning30/path"
+	"morning30/segments/pages"
 
 	"github.com/doors-dev/doors"
 	"github.com/doors-dev/gox"
@@ -84,7 +84,7 @@ func (a App) Main() gox.Elem {
 //line app.gox:32
 					__e = __c.Set("name", "apple-mobile-web-app-title"); if __e != nil { return }
 //line app.gox:32
-					__e = __c.Set("content", "dani.cc"); if __e != nil { return }
+					__e = __c.Set("content", "morning30.com"); if __e != nil { return }
 				}
 				__e = __c.Submit(); if __e != nil { return }
 				__e = __c.InitVoid("link"); if __e != nil { return }
@@ -126,7 +126,7 @@ func (a App) Main() gox.Elem {
 				__e = __c.Init("title"); if __e != nil { return }
 				{
 					__e = __c.Submit(); if __e != nil { return }
-					__e = __c.Text("dani.cc"); if __e != nil { return }
+					__e = __c.Text("morning30.com"); if __e != nil { return }
 				}
 				__e = __c.Close(); if __e != nil { return }
 			}

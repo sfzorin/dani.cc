@@ -1,4 +1,4 @@
-module danicc
+module morning30
 
 go 1.25.1
 

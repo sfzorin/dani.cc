@@ -1,4 +1,4 @@
-# Dani — 30-day morning workout (PWA)
+# morning30.com — 30-day morning workout (PWA)
 
 A mobile-first web app for a daily morning routine. 30-day cycle, warm-up →
 main set (2 rounds) → cool-down. Floor + mat only, no jumps, no equipment.

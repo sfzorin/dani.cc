@@ -1,7 +1,7 @@
 package i18n
 
 import (
-	"danicc/internal/content"
+	"morning30/internal/content"
 	"testing"
 )
 

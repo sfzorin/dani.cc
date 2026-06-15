@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"os"
 
-	"danicc/assets"
-	"danicc/internal/app"
-	"danicc/internal/auth"
-	"danicc/internal/db"
-	"danicc/internal/i18n"
+	"morning30/assets"
+	"morning30/internal/app"
+	"morning30/internal/auth"
+	"morning30/internal/db"
+	"morning30/internal/i18n"
 
 	"github.com/doors-dev/doors"
 	"github.com/doors-dev/gox"
@@ -117,7 +117,7 @@ func main() {
 	mux.Handle("/", a)
 
 	addr := ":8080"
-	log.Printf("dani listening on %s", addr)
+	log.Printf("morning30 listening on %s", addr)
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal(err)
 	}

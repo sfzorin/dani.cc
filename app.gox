@@ -2,11 +2,11 @@
 package main
 
 import (
-	"danicc/assets"
-	"danicc/components"
-	"danicc/internal/auth"
-	"danicc/path"
-	"danicc/segments/pages"
+	"morning30/assets"
+	"morning30/components"
+	"morning30/internal/auth"
+	"morning30/path"
+	"morning30/segments/pages"
 
 	"github.com/doors-dev/doors"
 	"github.com/doors-dev/gox"
@@ -29,12 +29,12 @@ elem (a App) Main() {
 			<meta name="mobile-web-app-capable" content="yes">
 			<meta name="apple-mobile-web-app-capable" content="yes">
 			<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-			<meta name="apple-mobile-web-app-title" content="dani.cc">
+			<meta name="apple-mobile-web-app-title" content="morning30.com">
 			<link rel="manifest" href="/static/manifest.webmanifest">
 			<link rel="icon" type="image/svg+xml" href="/static/icon.svg">
 			<link rel="apple-touch-icon" href="/static/icon-180.png">
 			<link rel="stylesheet" href=(assets.Style) name="main.css">
-			<title>dani.cc</title>
+			<title>morning30.com</title>
 		</head>
 		<body>
 			~(doors.Route(

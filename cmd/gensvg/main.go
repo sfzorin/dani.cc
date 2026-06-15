@@ -12,7 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"danicc/internal/content"
+	"morning30/internal/content"
 )
 
 // theme returns (background, figure) colors for a slot.
