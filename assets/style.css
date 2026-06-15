@@ -444,7 +444,23 @@ h1, h2, h3 { margin: 0 0 .4em; }
 .pbar-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .4s ease; }
 .phase { color: var(--muted); font-size: 13px; min-width: 0; }
 
-.stage { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; }
+.stage { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; }
+
+/* Paused: "freeze" everything but the bottom controls. */
+.player.frozen .stage > * { filter: grayscale(.9) brightness(.5); opacity: .8; transition: filter .2s ease, opacity .2s ease; }
+.player.frozen .player-top { opacity: .4; transition: opacity .2s ease; }
+.player.frozen .stage::after {
+  content: "⏸";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 84px;
+  color: rgba(186, 230, 253, .92);
+  text-shadow: 0 2px 16px rgba(0, 0, 0, .5);
+  pointer-events: none;
+}
 .ex-index { color: var(--muted); font-size: 14px; font-weight: 600; }
 .ex-svg { width: min(60vw, 230px, 34vh); aspect-ratio: 1; height: auto; border-radius: 22px; background: #fff; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .ex-svg:active { transform: scale(.98); }

@@ -223,6 +223,7 @@
   function startItem(idx) {
     i = idx;
     var it = items[i];
+    root.classList.remove("frozen"); // a fresh set is always running, not paused
     el.rest.classList.add("hidden");
     el.stage.classList.remove("hidden");
     el.controls.classList.remove("hidden");
@@ -443,6 +444,7 @@
   el.pause.addEventListener("click", function () {
     paused = !paused;
     el.pause.textContent = paused ? t("resume") : t("pause");
+    root.classList.toggle("frozen", paused); // freeze the screen; controls stay live
     if (paused) shutUp();
   });
 
@@ -490,6 +492,7 @@
   function closeInfo() {
     el.infoOverlay.classList.add("hidden");
     paused = infoWasPaused;
+    root.classList.toggle("frozen", paused);
   }
   // doReplace swaps the current exercise for its replacement and restarts it.
   function doReplace() {
