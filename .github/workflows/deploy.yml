@@ -24,7 +24,8 @@ jobs:
       - name: Sync sources to deploy path
         run: |
           set -euo pipefail
-          mkdir -p "$DEPLOY_PATH"
+          sudo mkdir -p "$DEPLOY_PATH"
+          sudo chown "$USER:$USER" "$DEPLOY_PATH"
           rsync -az --delete \
             --exclude='.git' \
             --exclude='.github' \
@@ -53,15 +54,55 @@ jobs:
             exit 1
           fi
 
+          echo "==> update caddy route"
+          CADDYFILE=/opt/caddy/Caddyfile
+          START='# BEGIN morning30.com'
+          END='# END morning30.com'
+          base="$(mktemp)"
+          candidate="$(mktemp)"
+          awk -v start="$START" -v end="$END" '
+            $0 == start { skip = 1; next }
+            $0 == end { skip = 0; next }
+            !skip { print }
+          ' "$CADDYFILE" > "$base"
+          {
+            cat "$base"
+            printf '\n'
+            printf '%s\n' "$START"
+            printf '%s\n' 'morning30.com {'
+            printf '\t%s\n' 'encode zstd gzip'
+            printf '\n'
+            printf '\t%s\n' 'handle {'
+            printf '\t\t%s\n' 'reverse_proxy morning30-web:8080'
+            printf '\t%s\n' '}'
+            printf '\n'
+            printf '\t%s\n' 'header {'
+            printf '\t\t%s\n' 'X-Frame-Options "DENY"'
+            printf '\t\t%s\n' 'X-Content-Type-Options "nosniff"'
+            printf '\t\t%s\n' 'Referrer-Policy "strict-origin-when-cross-origin"'
+            printf '\t\t%s\n' 'Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"'
+            printf '\t\t%s\n' '-Server'
+            printf '\t%s\n' '}'
+            printf '%s\n' '}'
+            printf '%s\n' "$END"
+          } > "$candidate"
+          docker cp "$candidate" caddy-proxy:/tmp/Caddyfile.morning30
+          docker exec caddy-proxy caddy validate --config /tmp/Caddyfile.morning30
+          sudo tee "$CADDYFILE" >/dev/null < "$candidate"
+          rm -f "$base" "$candidate"
+
           echo "==> validate and reload caddy"
           docker exec caddy-proxy caddy validate --config /etc/caddy/Caddyfile
           docker exec caddy-proxy caddy reload --config /etc/caddy/Caddyfile
 
+          echo "==> remove legacy dani-web container"
+          docker rm -f dani-web 2>/dev/null || true
+
           echo "==> public HTTPS smoke test"
           public_title=""
           for i in 1 2 3 4 5 6 7 8 9 10; do
-            if curl -fsSIL --max-time 20 https://morning30.com/ >/tmp/morning-public-headers.txt \
-              && curl -fsS --max-time 20 https://morning30.com/ >/tmp/morning-public.html; then
+            curl -sSIL --max-time 20 https://morning30.com/ >/tmp/morning-public-headers.txt || true
+            if curl -fsS --max-time 20 https://morning30.com/ >/tmp/morning-public.html; then
               public_title="$(sed -n 's/.*<title>\([^<]*\)<\/title>.*/\1/p' /tmp/morning-public.html | head -n 1)"
               if [ -n "$public_title" ]; then
                 break
