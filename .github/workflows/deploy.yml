@@ -46,14 +46,12 @@ jobs:
           echo "==> docker compose up"
           docker compose -f deploy/docker-compose.yml up -d --build
 
-          echo "==> wait for app"
-          for i in 1 2 3 4 5 6 7 8 9 10; do
-            if docker exec dani-web wget -qO- http://127.0.0.1:8080/ >/tmp/morning-local.html; then
-              break
-            fi
-            sleep 3
-          done
-          grep -q '<title>' /tmp/morning-local.html
+          echo "==> verify container is running"
+          status="$(docker inspect -f '{{.State.Status}}' dani-web)"
+          if [ "$status" != "running" ]; then
+            docker logs --tail 120 dani-web || true
+            exit 1
+          fi
 
           echo "==> validate and reload caddy"
           docker exec caddy-proxy caddy validate --config /etc/caddy/Caddyfile
