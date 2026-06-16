@@ -3,8 +3,8 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    image: dani-web:latest
-    container_name: dani-web
+    image: morning30-web:latest
+    container_name: morning30-web
     restart: unless-stopped
     environment:
       MORNING_DB: /data/morning.db

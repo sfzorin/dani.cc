@@ -15,7 +15,7 @@ jobs:
     runs-on: [self-hosted, morning30, misc]
     timeout-minutes: 25
     env:
-      DEPLOY_PATH: /opt/dani.cc
+      DEPLOY_PATH: /opt/morning30.com
 
     steps:
       - name: Checkout
@@ -47,9 +47,9 @@ jobs:
           docker compose -f deploy/docker-compose.yml up -d --build
 
           echo "==> verify container is running"
-          status="$(docker inspect -f '{{.State.Status}}' dani-web)"
+          status="$(docker inspect -f '{{.State.Status}}' morning30-web)"
           if [ "$status" != "running" ]; then
-            docker logs --tail 120 dani-web || true
+            docker logs --tail 120 morning30-web || true
             exit 1
           fi
 
